@@ -1,0 +1,5 @@
+# fieldPicker 节点模板：字段投影（对象或对象列表）
+name: "fieldPicker"
+config:
+  data: "{{ users }}"
+  fields: [id, name, level]

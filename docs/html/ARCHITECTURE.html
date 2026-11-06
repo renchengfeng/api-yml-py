@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lowcode 架构与算子生命周期</title>
+<style>
+  :root {
+    --ink: #1f2937; --muted: #6b7280; --line: #e5e7eb; --bg: #f7f8fa; --card: #fff;
+    --base: #64748b; --op: #2563eb; --conf: #0891b2; --compile: #7c3aed;
+    --exec: #059669; --web: #ea580c; --reg: #db2777;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink);
+         font: 14px/1.65 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 32px 24px 80px; }
+  header { border-bottom: 2px solid var(--ink); padding-bottom: 18px; margin-bottom: 30px; }
+  h1 { font-size: 26px; margin: 0 0 8px; }
+  h2 { font-size: 19px; margin: 42px 0 6px; padding-left: 11px; border-left: 4px solid var(--op); }
+  h2 span.no { color: var(--muted); font-size: 13px; font-weight: normal; margin-right: 8px; }
+  .sub { color: var(--muted); font-size: 13px; margin: 0; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin-top: 14px; font-size: 12px; color: var(--muted); }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  section { margin-top: 14px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; }
+  code, .mono { font: 12px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  code { background: #f1f5f9; padding: 1px 5px; border-radius: 3px; color: #0f172a; }
+  .arrow { width: 2px; height: 20px; background: var(--line); margin: 0 auto; position: relative; }
+  .arrow::after { content: ""; position: absolute; bottom: -8px; left: -5px;
+                  border: 6px solid transparent; border-top-color: #94a3b8; }
+  .layer { border-left: 5px solid var(--base); }
+  .layer .lhead { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .layer .lname { font-weight: 700; font-size: 15px; }
+  .layer .lrole { color: var(--muted); font-size: 12px; }
+  .layer .files { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 8px; margin-top: 8px; }
+  .layer .f { border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; background: #fcfcfd; }
+  .layer .f b { display: block; font-size: 12px; }
+  .layer .f span { color: var(--muted); font-size: 12px; }
+  .l-base { border-color: var(--base); } .l-op { border-color: var(--op); }
+  .l-conf { border-color: var(--conf); } .l-compile { border-color: var(--compile); }
+  .l-exec { border-color: var(--exec); } .l-web { border-color: var(--web); }
+
+  .stage { border: 1px solid var(--line); border-radius: 10px; overflow: hidden; margin: 14px 0; background: #fff; }
+  .stage > .sh { padding: 9px 14px; color: #fff; font-weight: 700; display: flex; gap: 12px; align-items: baseline; }
+  .stage > .sh small { font-weight: 400; opacity: .9; }
+  .s-reg { background: var(--reg); } .s-compile { background: var(--compile); } .s-exec { background: var(--exec); }
+  .stage .body { padding: 14px; }
+  .steps { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; }
+  .step { flex: 1 1 200px; min-width: 190px; border: 1px solid var(--line); border-top: 3px solid var(--compile);
+          border-radius: 6px; padding: 9px 11px; background: #fff; position: relative; }
+  .s-reg .step { border-top-color: var(--reg); } .s-exec .step { border-top-color: var(--exec); }
+  .step .n { font-size: 11px; color: #fff; background: var(--muted); border-radius: 10px; padding: 0 7px; }
+  .s-compile .step .n { background: var(--compile); } .s-reg .step .n { background: var(--reg); }
+  .s-exec .step .n { background: var(--exec); }
+  .step .fn { display: block; margin: 6px 0 3px; font: 600 12px/1.5 ui-monospace, Menlo, monospace; color: #0f172a; }
+  .step .where { color: var(--muted); font: 11px/1.5 ui-monospace, Menlo, monospace; }
+  .step p { margin: 5px 0 0; font-size: 12px; color: #374151; }
+  .step .out { display: inline-block; margin-top: 6px; font-size: 11px; background: #f1f5f9;
+               border-radius: 3px; padding: 1px 6px; color: #334155; }
+  .sep { align-self: center; color: #94a3b8; font-size: 16px; }
+
+  table { width: 100%; border-collapse: collapse; background: #fff; font-size: 12.5px; }
+  th, td { border: 1px solid var(--line); padding: 7px 10px; text-align: left; vertical-align: top; }
+  th { background: #eef2f7; }
+  td:first-child { white-space: nowrap; font: 12px ui-monospace, Menlo, monospace; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+  pre { background: #0f172a; color: #e2e8f0; padding: 12px 14px; border-radius: 8px; overflow-x: auto;
+        font: 12px/1.7 ui-monospace, Menlo, Consolas, monospace; margin: 0; }
+  pre .c { color: #94a3b8; } pre .k { color: #7dd3fc; } pre .v { color: #fcd34d; }
+  ul.rules { margin: 8px 0 0; padding-left: 20px; font-size: 13px; }
+  ul.rules li { margin: 5px 0; }
+  .note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  footer { margin-top: 50px; border-top: 1px solid var(--line); padding-top: 14px; color: var(--muted); font-size: 12px; }
+  @media (max-width: 760px) { .grid2 { grid-template-columns: 1fr; } }
+  @media print { body { background: #fff; } .card, .stage { break-inside: avoid; } }
+
+  /* 函数调用关系树 */
+  .callgroup { background: #fff; border: 1px solid var(--line); border-radius: 10px; margin: 14px 0; overflow: hidden; }
+  .callgroup > .ch { padding: 9px 14px; color: #fff; font-weight: 700; display: flex; gap: 12px; align-items: baseline; }
+  .callgroup > .ch small { font-weight: 400; opacity: .88; }
+  .ch.reg { background: var(--reg); } .ch.compile { background: var(--compile); } .ch.exec { background: var(--exec); }
+  .callbody { padding: 12px 14px 16px; overflow-x: auto; }
+  ul.tree, ul.tree ul { list-style: none; margin: 0; padding-left: 20px; }
+  ul.tree { padding-left: 0; }
+  ul.tree ul { border-left: 1px dashed #cbd5e1; margin-left: 8px; }
+  ul.tree li { position: relative; padding: 4px 0 4px 16px; }
+  ul.tree li::before { content: ""; position: absolute; left: -12px; top: 21px; width: 14px; height: 1px; background: #cbd5e1; }
+  ul.tree > li::before { display: none; }
+  .node { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; border: 1px solid var(--line);
+          border-left: 3px solid var(--base); border-radius: 5px; padding: 5px 9px; background: #fcfcfd; }
+  .node .file { font: 11px ui-monospace, Menlo, monospace; color: #fff; background: var(--base); border-radius: 3px; padding: 0 6px; }
+  .node .fn { font: 600 12px ui-monospace, Menlo, monospace; color: #0f172a; }
+  .node .act { color: var(--muted); font-size: 11.5px; }
+  .node .ret { font-size: 11px; background: #eef2f7; border-radius: 3px; padding: 0 6px; color: #334155; }
+  .node.reg { border-left-color: var(--reg); } .node.compile { border-left-color: var(--compile); }
+  .node.exec { border-left-color: var(--exec); }
+  .node .file.reg { background: var(--reg); } .node .file.compile { background: var(--compile); }
+  .node .file.exec { background: var(--exec); }
+
+  /* 唯一节点调用图 */
+  .graphwrap { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; overflow-x: auto; }
+  .graphwrap svg { display: block; width: 2460px; max-width: none; height: auto; }
+  .graphnote { font-size: 12px; color: var(--muted); margin: 8px 0 0; }
+
+  /* 加载与调用主线图 */
+  .model { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 14px 0 18px; }
+  .mcard { border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; background: #fff; border-top: 4px solid var(--compile); }
+  .mcard.exec { border-top-color: var(--exec); }
+  .mcard b { display: block; font-size: 14px; margin-bottom: 4px; }
+  .mcard span { color: var(--muted); font-size: 12.5px; }
+  .mcard code { font-size: 11.5px; }
+  .phase { background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+  .phase > .ph { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 10px 18px; color: #fff; }
+  .phase.load > .ph { background: linear-gradient(90deg, #1e40af, #3b82f6); }
+  .phase.exec > .ph { background: linear-gradient(90deg, #047857, #10b981); }
+  .phase > .ph b { font-size: 15px; }
+  .phase > .ph small { font-weight: 400; opacity: .9; font-size: 12px; }
+  .timeline { padding: 16px 18px 18px; }
+  .tstep { display: grid; grid-template-columns: 46px 1fr auto; gap: 12px; align-items: start; position: relative; padding: 5px 0 13px; }
+  .tstep::before { content: ""; position: absolute; left: 22px; top: 0; bottom: 0; width: 2px; background: #e2e8f0; }
+  .tstep:last-child::before { bottom: 8px; }
+  .tstep .dot { position: relative; z-index: 1; width: 46px; height: 46px; border-radius: 50%; color: #fff;
+                display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 13px; }
+  .phase.load .dot { background: #3b82f6; } .phase.exec .dot { background: #10b981; }
+  .tstep .tx b { display: block; font-size: 15px; line-height: 1.4; }
+  .tstep .tx code { display: block; background: none; padding: 0; margin-top: 2px; font-size: 11px; color: #475569; }
+  .tstep .tx p { margin: 4px 0 0; font-size: 12.5px; color: #64748b; }
+  .tstep .side { display: flex; flex-direction: column; gap: 5px; align-items: flex-end; }
+  .tstep .freq { font-size: 10.5px; color: #fff; border-radius: 999px; padding: 1px 9px; white-space: nowrap; }
+  .phase.load .freq { background: #93c5fd; color: #1e3a8a; } .phase.exec .freq { background: #a7f3d0; color: #065f46; }
+  .tstep .out { font-size: 10.5px; background: #f1f5f9; border-radius: 999px; padding: 1px 9px; color: #334155; white-space: nowrap; }
+  .gate { text-align: center; color: #64748b; font-size: 12px; margin: 14px 0; padding: 8px 0;
+          border-top: 1px dashed #cbd5e1; border-bottom: 1px dashed #cbd5e1; }
+  .gate b { color: var(--exec); }
+  .mainflow-note { font-size: 12px; color: var(--muted); margin-top: 10px; }
+  @media (max-width: 760px) {
+    .model { grid-template-columns: 1fr; }
+    .tstep { grid-template-columns: 40px 1fr; }
+    .tstep .side { grid-column: 2; flex-direction: row; align-items: center; }
+    .tstep .dot { width: 40px; height: 40px; }
+    .tstep::before { left: 19px; }
+  }
+
+  h3 { font-size: 15px; margin: 24px 0 8px; }
+  .pit { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: #fff; }
+  .pit b { display: block; font-size: 13px; margin-bottom: 3px; }
+  .pit span { color: var(--muted); font-size: 12px; }
+  .pit code { font-size: 11.5px; }
+
+  /* 文件级行为图 */
+  .arch { display: flex; gap: 10px; overflow-x: auto; padding: 4px 2px 14px; align-items: stretch; }
+  .lane { flex: 0 0 300px; background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 10px; }
+  .lane-h { font-size: 12px; font-weight: 700; color: #fff; border-radius: 6px; padding: 3px 9px; display: inline-block; margin-bottom: 9px; }
+  .lane-h.entry { background: #ea580c; } .lane-h.compile { background: #7c3aed; }
+  .lane-h.exec { background: #059669; } .lane-h.op { background: #2563eb; }
+  .lane-h.ds { background: #0891b2; } .lane-h.base { background: #64748b; }
+  .fnode { border: 1px solid var(--line); border-radius: 8px; margin-bottom: 9px; overflow: hidden; }
+  .fnode:last-child { margin-bottom: 0; }
+  .fhead { display: flex; justify-content: space-between; align-items: baseline; gap: 8px;
+           background: #f8fafc; border-bottom: 1px solid var(--line); padding: 5px 9px; }
+  .fhead .fname { font: 600 11.5px ui-monospace, Menlo, monospace; color: #0f172a; }
+  .fhead .ftag { font-size: 10px; color: #64748b; white-space: nowrap; }
+  .fns { list-style: none; margin: 0; padding: 6px 9px 8px; }
+  .fns li { padding: 3px 0; border-bottom: 1px dashed #f1f5f9; }
+  .fns li:last-child { border-bottom: none; }
+  .fns code { font-size: 11px; background: #eef2f7; padding: 0 4px; }
+  .fns span { display: block; color: #64748b; font-size: 11px; margin-top: 1px; }
+  .fns em { display: block; font: 10.5px ui-monospace, Menlo, monospace; color: #2563eb; font-style: normal; margin-top: 1px; }
+  .lane-arrow { align-self: center; color: #94a3b8; font-size: 18px; padding: 0 1px; }
+  .arch-legend { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+  @media (max-width: 900px) {
+    .arch { flex-direction: column; }
+    .lane { flex: 1 1 auto; }
+    .lane-arrow { transform: rotate(90deg); align-self: flex-start; margin-left: 18px; }
+  }
+
+  .graphwrap.wide svg { width: 2520px; }
+:root { --a:#2563eb; --b:#0891b2; --cast:#7c3aed; --group:#059669; --filter:#d97706; --resp:#0f766e; }
+/* ---- 数据流 ---- */
+  .req { background:#0f172a; color:#e2e8f0; border-radius:8px; padding:9px 13px;
+         font:12.5px ui-monospace, Menlo, monospace; margin:6px 0 14px; overflow-x:auto; }
+  .req b { color:#7dd3fc; font-weight:600; }
+  .cols { display:grid; grid-template-columns: minmax(0,1.45fr) minmax(0,1fr); gap:16px; align-items:start; }
+  .flow { display:flex; flex-direction:column; }
+  .step { position:relative; display:grid; grid-template-columns:38px 1fr; gap:10px; padding-bottom:12px; }
+  .step::before { content:""; position:absolute; left:18px; top:38px; bottom:0; width:2px; background:#e5e7eb; }
+  .step:last-child::before { display:none; }
+  .step .n { position:relative; z-index:1; width:36px; height:36px; border-radius:50%; color:#fff;
+             display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; }
+  .step .body { background:#fff; border:1px solid var(--line); border-left:4px solid var(--a);
+                border-radius:8px; padding:8px 11px; }
+  .step .head { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; }
+  .step .id { font:600 12.5px ui-monospace, Menlo, monospace; }
+  .step .op { font-size:11.5px; color:var(--muted); }
+  .step .rw { margin-top:3px; font-size:11.5px; color:#374151; }
+  .step pre { margin:5px 0 0; padding:6px 8px; background:#f8fafc; border:1px solid #eef2f7;
+              border-radius:5px; overflow-x:auto; font:11.5px/1.5 ui-monospace, Menlo, monospace; color:#0f172a; }
+
+  .board { position:sticky; top:14px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:11px 13px; }
+  .board h3 { font-size:12.5px; margin:0 0 3px; }
+  .board .sub { color:var(--muted); font-size:11.5px; margin:0 0 8px; }
+  .board .k { display:flex; gap:8px; align-items:baseline; padding:4px 0; border-bottom:1px dashed #f1f5f9; }
+  .board .k:last-child { border-bottom:none; }
+  .board .k .key { font:600 11.5px ui-monospace, Menlo, monospace; min-width:64px; }
+  .board .k .val { font:11px ui-monospace, Menlo, monospace; color:#334155; overflow-x:auto; white-space:nowrap; }
+
+  .resp { margin-top:14px; background:#fff; border:1px solid var(--line); border-left:4px solid var(--resp);
+          border-radius:8px; padding:9px 12px; }
+  .resp .t { font-size:12.5px; color:var(--muted); margin-bottom:4px; }
+  .resp pre { margin:0; padding:8px 10px; background:#0f172a; color:#e2e8f0; border-radius:6px;
+              overflow-x:auto; font:12px/1.6 ui-monospace, Menlo, monospace; }
+
+  .tips { margin-top:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .tip { background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:9px 12px; font-size:11.5px; }
+  .tip b { display:block; color:#b45309; margin-bottom:2px; }
+
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+<header>
+  <h1>lowcode 架构与算子生命周期</h1>
+  <p class="sub">以 <code>redisGet</code> 为例，按「注册期 → 编译期 → 请求期」三段追踪真实调用链。
+     所有节点标注 <span class="mono">文件:函数</span>；基于当前仓库代码，图中不含伪代码。</p>
+  <div class="legend">
+    <span><i style="background:var(--base)"></i>基础层</span>
+    <span><i style="background:var(--op)"></i>算子层</span>
+    <span><i style="background:var(--conf)"></i>配置层</span>
+    <span><i style="background:var(--compile)"></i>编译层</span>
+    <span><i style="background:var(--exec)"></i>执行层</span>
+    <span><i style="background:var(--web)"></i>Web / 入口层</span>
+    <span><i style="background:var(--reg)"></i>注册期</span>
+  </div>
+</header>
+
+<h2><span class="no">01</span>核心分层与文件</h2>
+<section>
+  <div class="card layer l-base">
+    <div class="lhead"><span class="lname">基础层</span><span class="lrole">不依赖任何业务包，被所有层引用</span></div>
+    <div class="files">
+      <div class="f"><b>spec.py</b><span><code>Field</code> / <code>validate()</code> / <code>check_type()</code> / <code>is_template()</code> / <code>child()</code> —— 配置字段声明、校验与报错定位</span></div>
+      <div class="f"><b>errors.py</b><span><code>LowcodeError</code> / <code>ConfigError</code> / <code>ExecError</code> / <code>BizError</code> / <code>ErrorCollector</code></span></div>
+    </div>
+  </div>
+  <div class="arrow"></div>
+  <div class="card layer l-op">
+    <div class="lhead"><span class="lname">算子层 · lowcode/operators/</span><span class="lrole">声明「有哪些算子、每个算子要什么参数、怎么执行」</span></div>
+    <div class="files">
+      <div class="f"><b>base.py</b><span><code>Operator</code>：<code>build()</code> 启动期一次 / <code>execute(ctx,args)</code> 每请求一次 / <code>describe()</code> / <code>config_error()</code></span></div>
+      <div class="f"><b>registry.py</b><span><code>register()</code> 类装饰器 / <code>get_operator()</code> / <code>create_operator()</code> / <code>list_operators()</code> —— 全局表 <code>_operators</code></span></div>
+      <div class="f"><b>__init__.py</b><span>末尾 <code>from . import aggregate, external, filter, selector, transformer</code> —— 导入即注册</span></div>
+      <div class="f"><b>&lt;分类&gt;/&lt;算子&gt;.py</b><span>如 <code>external/uredis/redisGet.py</code>：类变量 <code>spec</code> + <code>build()</code> + <code>execute()</code></span></div>
+    </div>
+  </div>
+  <div class="arrow"></div>
+  <div class="card layer l-conf">
+    <div class="lhead"><span class="lname">配置层 · config/</span><span class="lrole">YAML → 强类型定义</span></div>
+    <div class="files">
+      <div class="f"><b>config/loader.py</b><span><code>load_config()</code> → <code>ServerDef</code> / <code>GroupDef</code> / <code>ApiDef</code> / <code>NodeDef</code>；<code>read_yaml()</code> / <code>load_node()</code></span></div>
+      <div class="f"><b>config/models.py</b><span><code>SERVER_SPEC</code> / <code>API_SPEC</code> / <code>NODE_SPEC</code>（<code>name / id / depends / desc / config</code>）</span></div>
+      <div class="f"><b>datasources/</b><span><code>DataSource</code> / <code>DataSourceManager.from_config()</code> / <code>resolve()</code> / <code>check_dependencies()</code></span></div>
+    </div>
+  </div>
+  <div class="arrow"></div>
+  <div class="card layer l-compile">
+    <div class="lhead"><span class="lname">编译层 · core/builder.py + core/template.py + core/graph.py</span><span class="lrole">每接口一次：把 ApiDef 编成 ApiPlan</span></div>
+    <div class="files">
+      <div class="f"><b>core/builder.py</b><span><code>Builder.build()</code> → <code>build_api()</code> → <code>compile_node()</code> → <code>_compile_config()</code> / <code>_check_refs()</code>；产物 <code>PlanNode</code> / <code>ApiPlan</code></span></div>
+      <div class="f"><b>core/template.py</b><span><code>compile_template()</code> → <code>_Const/_Expr/_Text/_Composite</code>；<code>Template.render(scope)</code>；<code>_analyze()</code> 静态引用分析</span></div>
+      <div class="f"><b>core/graph.py</b><span><code>Graph.levels()</code> 拓扑分层；<code>_check_reachable()</code> 检查悬空节点</span></div>
+    </div>
+  </div>
+  <div class="arrow"></div>
+  <div class="card layer l-exec">
+    <div class="lhead"><span class="lname">执行层 · core/executor.py + core/context.py</span><span class="lrole">每请求一次：按层执行 DAG</span></div>
+    <div class="files">
+      <div class="f"><b>core/executor.py</b><span><code>Executor.run()</code> / <code>_run_parallel()</code> / <code>run_node()</code>（所有节点执行的唯一入口）</span></div>
+      <div class="f"><b>core/context.py</b><span><code>Context.scope()</code> / <code>set_output()</code> / <code>output()</code> / <code>record()</code> / <code>remaining()</code> —— 请求级黑板</span></div>
+    </div>
+  </div>
+  <div class="arrow"></div>
+  <div class="card layer l-web">
+    <div class="lhead"><span class="lname">Web / 入口层</span><span class="lrole">装配根与 HTTP 边界</span></div>
+    <div class="files">
+      <div class="f"><b>runtime.py</b><span><code>build_runtime()</code> 唯一装配点：配置 → 数据源 → 编译 → 执行器 → <code>Runtime</code></span></div>
+      <div class="f"><b>web/app.py</b><span><code>create_app()</code> 注册路由 / <code>view()</code> 收集参数 / <code>_register_hooks()</code> 日志与错误</span></div>
+      <div class="f"><b>web/response.py</b><span><code>envelope()</code> → <code>{code, msg, traceId, data}</code></span></div>
+      <div class="f"><b>__main__.py</b><span><code>main()</code> CLI：<code>serve / check / explain / operators</code></span></div>
+    </div>
+  </div>
+</section>
+
+<h2><span class="no">02</span>唯一节点调用关系图 · redisGet</h2>
+<p class="sub">每个 <span class="mono">文件:函数</span> 只出现一次；横向 = 调用深度，同列 = 同一层；箭头 = 实际调用，悬停节点或连线可看完整说明。①~⑤ 是 build_runtime 的调用顺序。</p>
+<div class="graphwrap"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2460 1338" width="100%" role="img" aria-label="算子调用关系图" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+<style>path.link{transition:stroke-width .1s}path.link:hover{stroke-width:3;stroke-opacity:1}g.nd:hover rect.box{stroke:#94a3b8}</style>
+<defs>
+<marker id="a-reg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#db2777"/></marker>
+<marker id="a-compile" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/></marker>
+<marker id="a-exec" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/></marker>
+</defs>
+<rect x="14" y="30" width="2432" height="148" rx="10" fill="#fdf2f8" stroke="#db2777" stroke-opacity="0.28"/>
+<text x="32" y="57" font-size="13" font-weight="700" fill="#db2777">阶段 0 · 注册期</text>
+<text x="174" y="57" font-size="11" fill="#64748b">import 时一次</text>
+<rect x="14" y="198" width="2432" height="664" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-opacity="0.28"/>
+<text x="32" y="225" font-size="13" font-weight="700" fill="#7c3aed">阶段 1 · 编译期</text>
+<text x="174" y="225" font-size="11" fill="#64748b">每个接口一次</text>
+<rect x="14" y="882" width="2432" height="406" rx="10" fill="#ecfdf5" stroke="#059669" stroke-opacity="0.28"/>
+<text x="32" y="909" font-size="13" font-weight="700" fill="#059669">阶段 2 · 请求期</text>
+<text x="174" y="909" font-size="11" fill="#64748b">每个请求一次</text>
+<path class="link" d="M 296.0 106.0 H 321.0 V 106.0 H 346.0" fill="none" stroke="#db2777" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-reg)"><title>operators/__init__.py:模块导入 → external/uredis/__init__.py:from . import redisGet（触发模块体执行）</title></path>
+<path class="link" d="M 596.0 106.0 H 621.0 V 106.0 H 646.0" fill="none" stroke="#db2777" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-reg)"><title>external/uredis/__init__.py:from . import redisGet → external/uredis/redisGet.py:@register(&quot;redisGet&quot;)（装饰器作用于 RedisGet 类）</title></path>
+<path class="link" d="M 896.0 106.0 H 921.0 V 106.0 H 946.0" fill="none" stroke="#db2777" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-reg)"><title>external/uredis/redisGet.py:@register(&quot;redisGet&quot;) → operators/registry.py:register()（校验命名/spec/重名 → 写 _operators）</title></path>
+<path class="link" d="M 296.0 252.0 H 304.3 V 274.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → config/loader.py:load_config()（YAML → ServerDef）</title></path>
+<text x="300.2" y="246.0" font-size="10" fill="#7c3aed" text-anchor="middle">①</text>
+<path class="link" d="M 296.0 263.0 H 312.7 V 360.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → datasources/__init__.py:from_config()（实例化全部数据源）</title></path>
+<text x="304.3" y="257.0" font-size="10" fill="#7c3aed" text-anchor="middle">②</text>
+<path class="link" d="M 596.0 360.0 H 612.7 V 274.0 H 646.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>datasources/__init__.py:from_config() → datasources/__init__.py:create_datasource()（构造数据源 + check()）</title></path>
+<path class="link" d="M 296.0 274.0 H 321.0 V 446.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → core/builder.py:Builder.build()（逐 group / api 编译）</title></path>
+<text x="308.5" y="268.0" font-size="10" fill="#7c3aed" text-anchor="middle">③</text>
+<path class="link" d="M 596.0 446.0 H 629.3 V 360.0 H 646.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:Builder.build() → core/builder.py:build_api()（分层、定结果节点）</title></path>
+<path class="link" d="M 896.0 349.0 H 908.5 V 274.0 H 946.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:build_api() → core/inputs.py:InputSchema()（构造入参校验器）</title></path>
+<path class="link" d="M 896.0 360.0 H 921.0 V 360.0 H 946.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:build_api() → core/builder.py:compile_node()（编译单个节点）</title></path>
+<path class="link" d="M 896.0 371.0 H 933.5 V 446.0 H 946.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:build_api() → core/builder.py:_check_outputs()（outputs 对账）</title></path>
+<path class="link" d="M 1196.0 354.5 H 1212.7 V 274.0 H 1246.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:compile_node() → operators/registry.py:create_operator()（查表/防注入/校验/build）</title></path>
+<path class="link" d="M 1496.0 252.0 H 1502.2 V 274.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → operators/registry.py:get_operator()（查 _operators）</title></path>
+<path class="link" d="M 1496.0 263.0 H 1508.5 V 360.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → spec.py:is_template()（非 dynamic/raw 拒绝模板）</title></path>
+<path class="link" d="M 1496.0 274.0 H 1514.8 V 446.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → spec.py:validate()（按 spec 校验补默认）</title></path>
+<path class="link" d="M 1496.0 285.0 H 1521.0 V 532.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → external/uredis/redisGet.py:RedisGet()（实例化算子）</title></path>
+<path class="link" d="M 1496.0 296.0 H 1527.2 V 618.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → external/uredis/redisGet.py:RedisGet.build()（取数据源 + 校验配置）</title></path>
+<path class="link" d="M 1796.0 612.5 H 1808.5 V 274.0 H 1846.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>external/uredis/redisGet.py:RedisGet.build() → core/builder.py:BuildEnv.datasource()（解析 kv 数据源）</title></path>
+<path class="link" d="M 2096.0 268.5 H 2112.7 V 274.0 H 2146.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:BuildEnv.datasource() → datasources/__init__.py:resolve()（按 (name, kind) 匹配）</title></path>
+<path class="link" d="M 2096.0 279.5 H 2129.3 V 360.0 H 2146.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:BuildEnv.datasource() → datasources/redis.py:check_dependencies()（find_spec 探测依赖）</title></path>
+<path class="link" d="M 1796.0 623.5 H 1821.0 V 360.0 H 1846.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>external/uredis/redisGet.py:RedisGet.build() → external/uredis/parse.py:check_config()（校验 csv 配置）</title></path>
+<path class="link" d="M 1196.0 365.5 H 1229.3 V 360.0 H 1246.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:compile_node() → core/builder.py:_compile_config()（拆 static/dynamic/raw）</title></path>
+<path class="link" d="M 1496.0 354.5 H 1533.5 V 704.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:_compile_config() → core/template.py:compile_template()（值 → Template）</title></path>
+<path class="link" d="M 1796.0 704.0 H 1833.5 V 446.0 H 1846.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/template.py:compile_template() → core/template.py:_analyze()（提取引用名）</title></path>
+<path class="link" d="M 1496.0 365.5 H 1539.8 V 790.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:_compile_config() → core/builder.py:_check_refs()（只允许 inputs/上游）</title></path>
+<path class="link" d="M 296.0 285.0 H 329.3 V 532.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → errors.py:raise_if_any()（汇总后一次抛 ConfigError）</title></path>
+<text x="312.7" y="279.0" font-size="10" fill="#7c3aed" text-anchor="middle">④</text>
+<path class="link" d="M 296.0 296.0 H 337.7 V 618.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → core/executor.py:Executor()（建线程池）</title></path>
+<text x="316.8" y="290.0" font-size="10" fill="#7c3aed" text-anchor="middle">⑤</text>
+<path class="link" d="M 296.0 941.5 H 306.0 V 958.0 H 346.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>web/app.py:view() → core/inputs.py:InputSchema.parse()（校验入参 → inputs）</title></path>
+<path class="link" d="M 296.0 952.5 H 316.0 V 1044.0 H 346.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>web/app.py:view() → core/context.py:Context()（请求级黑板）</title></path>
+<path class="link" d="M 296.0 963.5 H 326.0 V 1130.0 H 346.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>web/app.py:view() → core/executor.py:Executor.run()（按 levels 逐层）</title></path>
+<path class="link" d="M 596.0 1130.0 H 621.0 V 958.0 H 646.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:Executor.run() → core/executor.py:run_node()（所有节点唯一入口）</title></path>
+<path class="link" d="M 896.0 941.5 H 906.0 V 958.0 H 946.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:run_node() → core/builder.py:resolve_args()（静态原样 + dynamic 渲染）</title></path>
+<path class="link" d="M 1196.0 952.5 H 1206.0 V 958.0 H 1246.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/builder.py:resolve_args() → core/context.py:Context.scope()（上游输出 + inputs + request）</title></path>
+<path class="link" d="M 1196.0 963.5 H 1216.0 V 1044.0 H 1246.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/builder.py:resolve_args() → core/template.py:Template.render()（Jinja 沙箱求值）</title></path>
+<path class="link" d="M 896.0 952.5 H 916.0 V 1044.0 H 946.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:run_node() → external/uredis/redisGet.py:RedisGet.execute()（读键 + 按 format 解析）</title></path>
+<path class="link" d="M 1196.0 1038.5 H 1226.0 V 1130.0 H 1246.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>external/uredis/redisGet.py:RedisGet.execute() → datasources/redis.py:RedisDataSource.get()（懒加载客户端取字符串）</title></path>
+<path class="link" d="M 1196.0 1049.5 H 1236.0 V 1216.0 H 1246.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>external/uredis/redisGet.py:RedisGet.execute() → external/uredis/parse.py:parse_value()（raw/json/csv 解析）</title></path>
+<path class="link" d="M 896.0 963.5 H 926.0 V 1130.0 H 946.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:run_node() → core/context.py:Context.set_output()（写黑板供下游引用）</title></path>
+<path class="link" d="M 896.0 974.5 H 936.0 V 1216.0 H 946.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:run_node() → core/context.py:Context.record()（finally 记 trace）</title></path>
+<path class="link" d="M 296.0 974.5 H 336.0 V 1216.0 H 346.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>web/app.py:view() → web/response.py:envelope()（{code,msg,traceId,data}）</title></path>
+<g class="nd"><title>operators/__init__.py:模块导入 —— 末尾导入五个分类包</title>
+<rect class="box" x="46" y="74" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="46" y="74" width="4" height="64" rx="2" fill="#db2777"/>
+<text x="58" y="92" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">operators/__init__.py</text>
+<text x="58" y="111" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">模块导入</text>
+<text x="58" y="127" font-size="9" fill="#94a3b8">末尾导入五个分类包</text>
+</g>
+<g class="nd"><title>external/uredis/__init__.py:from . import redisGet —— 触发模块体执行</title>
+<rect class="box" x="346" y="74" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="74" width="4" height="64" rx="2" fill="#db2777"/>
+<text x="358" y="92" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/__init__.py</text>
+<text x="358" y="111" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">from . import redisGet</text>
+<text x="358" y="127" font-size="9" fill="#94a3b8">触发模块体执行</text>
+</g>
+<g class="nd"><title>external/uredis/redisGet.py:@register(&quot;redisGet&quot;) —— 装饰器作用于 RedisGet 类</title>
+<rect class="box" x="646" y="74" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="646" y="74" width="4" height="64" rx="2" fill="#db2777"/>
+<text x="658" y="92" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="658" y="111" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">@register(&quot;redisGet&quot;)</text>
+<text x="658" y="127" font-size="9" fill="#94a3b8">装饰器作用于 RedisGet 类</text>
+</g>
+<g class="nd"><title>operators/registry.py:register() —— 校验命名/spec/重名 → 写 _operators</title>
+<rect class="box" x="946" y="74" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="74" width="4" height="64" rx="2" fill="#db2777"/>
+<text x="958" y="92" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">operators/registry.py</text>
+<text x="958" y="111" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">register()</text>
+<text x="958" y="127" font-size="9" fill="#94a3b8">校验命名/spec/重名 → 写 _operators</text>
+</g>
+<g class="nd"><title>runtime.py:build_runtime() —— 唯一装配入口</title>
+<rect class="box" x="46" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="46" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="58" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">runtime.py</text>
+<text x="58" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">build_runtime()</text>
+<text x="58" y="295" font-size="9" fill="#94a3b8">唯一装配入口</text>
+</g>
+<g class="nd"><title>config/loader.py:load_config() —— YAML → ServerDef</title>
+<rect class="box" x="346" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">config/loader.py</text>
+<text x="358" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">load_config()</text>
+<text x="358" y="295" font-size="9" fill="#94a3b8">YAML → ServerDef</text>
+</g>
+<g class="nd"><title>datasources/__init__.py:from_config() —— 实例化全部数据源</title>
+<rect class="box" x="346" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/__init__.py</text>
+<text x="358" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">from_config()</text>
+<text x="358" y="381" font-size="9" fill="#94a3b8">实例化全部数据源</text>
+</g>
+<g class="nd"><title>datasources/__init__.py:create_datasource() —— 构造数据源 + check()</title>
+<rect class="box" x="646" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="646" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="658" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/__init__.py</text>
+<text x="658" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">create_datasource()</text>
+<text x="658" y="295" font-size="9" fill="#94a3b8">构造数据源 + check()</text>
+</g>
+<g class="nd"><title>core/builder.py:Builder.build() —— 逐 group / api 编译</title>
+<rect class="box" x="346" y="414" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="414" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="432" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="358" y="451" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Builder.build()</text>
+<text x="358" y="467" font-size="9" fill="#94a3b8">逐 group / api 编译</text>
+</g>
+<g class="nd"><title>core/builder.py:build_api() —— 分层、定结果节点</title>
+<rect class="box" x="646" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="646" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="658" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="658" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">build_api()</text>
+<text x="658" y="381" font-size="9" fill="#94a3b8">分层、定结果节点</text>
+</g>
+<g class="nd"><title>core/inputs.py:InputSchema() —— 构造入参校验器</title>
+<rect class="box" x="946" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="958" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/inputs.py</text>
+<text x="958" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">InputSchema()</text>
+<text x="958" y="295" font-size="9" fill="#94a3b8">构造入参校验器</text>
+</g>
+<g class="nd"><title>core/builder.py:compile_node() —— 编译单个节点</title>
+<rect class="box" x="946" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="958" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="958" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">compile_node()</text>
+<text x="958" y="381" font-size="9" fill="#94a3b8">编译单个节点</text>
+</g>
+<g class="nd"><title>operators/registry.py:create_operator() —— 查表/防注入/校验/build</title>
+<rect class="box" x="1246" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1258" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">operators/registry.py</text>
+<text x="1258" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">create_operator()</text>
+<text x="1258" y="295" font-size="9" fill="#94a3b8">查表/防注入/校验/build</text>
+</g>
+<g class="nd"><title>operators/registry.py:get_operator() —— 查 _operators</title>
+<rect class="box" x="1546" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">operators/registry.py</text>
+<text x="1558" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">get_operator()</text>
+<text x="1558" y="295" font-size="9" fill="#94a3b8">查 _operators</text>
+</g>
+<g class="nd"><title>spec.py:is_template() —— 非 dynamic/raw 拒绝模板</title>
+<rect class="box" x="1546" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">spec.py</text>
+<text x="1558" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">is_template()</text>
+<text x="1558" y="381" font-size="9" fill="#94a3b8">非 dynamic/raw 拒绝模板</text>
+</g>
+<g class="nd"><title>spec.py:validate() —— 按 spec 校验补默认</title>
+<rect class="box" x="1546" y="414" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="414" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="432" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">spec.py</text>
+<text x="1558" y="451" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">validate()</text>
+<text x="1558" y="467" font-size="9" fill="#94a3b8">按 spec 校验补默认</text>
+</g>
+<g class="nd"><title>external/uredis/redisGet.py:RedisGet() —— 实例化算子</title>
+<rect class="box" x="1546" y="500" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="500" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="518" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="1558" y="537" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">RedisGet()</text>
+<text x="1558" y="553" font-size="9" fill="#94a3b8">实例化算子</text>
+</g>
+<g class="nd"><title>external/uredis/redisGet.py:RedisGet.build() —— 取数据源 + 校验配置</title>
+<rect class="box" x="1546" y="586" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="586" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="604" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="1558" y="623" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">RedisGet.build()</text>
+<text x="1558" y="639" font-size="9" fill="#94a3b8">取数据源 + 校验配置</text>
+</g>
+<g class="nd"><title>core/builder.py:BuildEnv.datasource() —— 解析 kv 数据源</title>
+<rect class="box" x="1846" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1846" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1858" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="1858" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">BuildEnv.datasource()</text>
+<text x="1858" y="295" font-size="9" fill="#94a3b8">解析 kv 数据源</text>
+</g>
+<g class="nd"><title>datasources/__init__.py:resolve() —— 按 (name, kind) 匹配</title>
+<rect class="box" x="2146" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="2146" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="2158" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/__init__.py</text>
+<text x="2158" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">resolve()</text>
+<text x="2158" y="295" font-size="9" fill="#94a3b8">按 (name, kind) 匹配</text>
+</g>
+<g class="nd"><title>datasources/redis.py:check_dependencies() —— find_spec 探测依赖</title>
+<rect class="box" x="2146" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="2146" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="2158" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/redis.py</text>
+<text x="2158" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">check_dependencies()</text>
+<text x="2158" y="381" font-size="9" fill="#94a3b8">find_spec 探测依赖</text>
+</g>
+<g class="nd"><title>external/uredis/parse.py:check_config() —— 校验 csv 配置</title>
+<rect class="box" x="1846" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1846" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1858" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/parse.py</text>
+<text x="1858" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">check_config()</text>
+<text x="1858" y="381" font-size="9" fill="#94a3b8">校验 csv 配置</text>
+</g>
+<g class="nd"><title>core/builder.py:_compile_config() —— 拆 static/dynamic/raw</title>
+<rect class="box" x="1246" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1258" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="1258" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">_compile_config()</text>
+<text x="1258" y="381" font-size="9" fill="#94a3b8">拆 static/dynamic/raw</text>
+</g>
+<g class="nd"><title>core/template.py:compile_template() —— 值 → Template</title>
+<rect class="box" x="1546" y="672" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="672" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="690" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/template.py</text>
+<text x="1558" y="709" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">compile_template()</text>
+<text x="1558" y="725" font-size="9" fill="#94a3b8">值 → Template</text>
+</g>
+<g class="nd"><title>core/template.py:_analyze() —— 提取引用名</title>
+<rect class="box" x="1846" y="414" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1846" y="414" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1858" y="432" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/template.py</text>
+<text x="1858" y="451" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">_analyze()</text>
+<text x="1858" y="467" font-size="9" fill="#94a3b8">提取引用名</text>
+</g>
+<g class="nd"><title>core/builder.py:_check_refs() —— 只允许 inputs/上游</title>
+<rect class="box" x="1546" y="758" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="758" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="776" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="1558" y="795" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">_check_refs()</text>
+<text x="1558" y="811" font-size="9" fill="#94a3b8">只允许 inputs/上游</text>
+</g>
+<g class="nd"><title>core/builder.py:_check_outputs() —— outputs 对账</title>
+<rect class="box" x="946" y="414" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="414" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="958" y="432" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="958" y="451" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">_check_outputs()</text>
+<text x="958" y="467" font-size="9" fill="#94a3b8">outputs 对账</text>
+</g>
+<g class="nd"><title>errors.py:raise_if_any() —— 汇总后一次抛 ConfigError</title>
+<rect class="box" x="346" y="500" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="500" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="518" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">errors.py</text>
+<text x="358" y="537" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">raise_if_any()</text>
+<text x="358" y="553" font-size="9" fill="#94a3b8">汇总后一次抛 ConfigError</text>
+</g>
+<g class="nd"><title>core/executor.py:Executor() —— 建线程池</title>
+<rect class="box" x="346" y="586" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="586" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="604" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/executor.py</text>
+<text x="358" y="623" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Executor()</text>
+<text x="358" y="639" font-size="9" fill="#94a3b8">建线程池</text>
+</g>
+<g class="nd"><title>web/app.py:view() —— Flask 路由视图</title>
+<rect class="box" x="46" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="46" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="58" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">web/app.py</text>
+<text x="58" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">view()</text>
+<text x="58" y="979" font-size="9" fill="#94a3b8">Flask 路由视图</text>
+</g>
+<g class="nd"><title>core/inputs.py:InputSchema.parse() —— 校验入参 → inputs</title>
+<rect class="box" x="346" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="358" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/inputs.py</text>
+<text x="358" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">InputSchema.parse()</text>
+<text x="358" y="979" font-size="9" fill="#94a3b8">校验入参 → inputs</text>
+</g>
+<g class="nd"><title>core/context.py:Context() —— 请求级黑板</title>
+<rect class="box" x="346" y="1012" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="1012" width="4" height="64" rx="2" fill="#059669"/>
+<text x="358" y="1030" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="358" y="1049" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Context()</text>
+<text x="358" y="1065" font-size="9" fill="#94a3b8">请求级黑板</text>
+</g>
+<g class="nd"><title>core/executor.py:Executor.run() —— 按 levels 逐层</title>
+<rect class="box" x="346" y="1098" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="1098" width="4" height="64" rx="2" fill="#059669"/>
+<text x="358" y="1116" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/executor.py</text>
+<text x="358" y="1135" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Executor.run()</text>
+<text x="358" y="1151" font-size="9" fill="#94a3b8">按 levels 逐层</text>
+</g>
+<g class="nd"><title>core/executor.py:run_node() —— 所有节点唯一入口</title>
+<rect class="box" x="646" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="646" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="658" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/executor.py</text>
+<text x="658" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">run_node()</text>
+<text x="658" y="979" font-size="9" fill="#94a3b8">所有节点唯一入口</text>
+</g>
+<g class="nd"><title>core/builder.py:resolve_args() —— 静态原样 + dynamic 渲染</title>
+<rect class="box" x="946" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="958" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="958" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">resolve_args()</text>
+<text x="958" y="979" font-size="9" fill="#94a3b8">静态原样 + dynamic 渲染</text>
+</g>
+<g class="nd"><title>core/context.py:Context.scope() —— 上游输出 + inputs + request</title>
+<rect class="box" x="1246" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="1258" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="1258" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Context.scope()</text>
+<text x="1258" y="979" font-size="9" fill="#94a3b8">上游输出 + inputs + request</text>
+</g>
+<g class="nd"><title>core/template.py:Template.render() —— Jinja 沙箱求值</title>
+<rect class="box" x="1246" y="1012" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="1012" width="4" height="64" rx="2" fill="#059669"/>
+<text x="1258" y="1030" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/template.py</text>
+<text x="1258" y="1049" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Template.render()</text>
+<text x="1258" y="1065" font-size="9" fill="#94a3b8">Jinja 沙箱求值</text>
+</g>
+<g class="nd"><title>external/uredis/redisGet.py:RedisGet.execute() —— 读键 + 按 format 解析</title>
+<rect class="box" x="946" y="1012" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="1012" width="4" height="64" rx="2" fill="#059669"/>
+<text x="958" y="1030" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="958" y="1049" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">RedisGet.execute()</text>
+<text x="958" y="1065" font-size="9" fill="#94a3b8">读键 + 按 format 解析</text>
+</g>
+<g class="nd"><title>datasources/redis.py:RedisDataSource.get() —— 懒加载客户端取字符串</title>
+<rect class="box" x="1246" y="1098" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="1098" width="4" height="64" rx="2" fill="#059669"/>
+<text x="1258" y="1116" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/redis.py</text>
+<text x="1258" y="1135" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">RedisDataSource.get()</text>
+<text x="1258" y="1151" font-size="9" fill="#94a3b8">懒加载客户端取字符串</text>
+</g>
+<g class="nd"><title>external/uredis/parse.py:parse_value() —— raw/json/csv 解析</title>
+<rect class="box" x="1246" y="1184" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="1184" width="4" height="64" rx="2" fill="#059669"/>
+<text x="1258" y="1202" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/parse.py</text>
+<text x="1258" y="1221" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">parse_value()</text>
+<text x="1258" y="1237" font-size="9" fill="#94a3b8">raw/json/csv 解析</text>
+</g>
+<g class="nd"><title>core/context.py:Context.set_output() —— 写黑板供下游引用</title>
+<rect class="box" x="946" y="1098" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="1098" width="4" height="64" rx="2" fill="#059669"/>
+<text x="958" y="1116" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="958" y="1135" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Context.set_output()</text>
+<text x="958" y="1151" font-size="9" fill="#94a3b8">写黑板供下游引用</text>
+</g>
+<g class="nd"><title>core/context.py:Context.record() —— finally 记 trace</title>
+<rect class="box" x="946" y="1184" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="1184" width="4" height="64" rx="2" fill="#059669"/>
+<text x="958" y="1202" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="958" y="1221" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Context.record()</text>
+<text x="958" y="1237" font-size="9" fill="#94a3b8">finally 记 trace</text>
+</g>
+<g class="nd"><title>web/response.py:envelope() —— {code,msg,traceId,data}</title>
+<rect class="box" x="346" y="1184" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="1184" width="4" height="64" rx="2" fill="#059669"/>
+<text x="358" y="1202" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">web/response.py</text>
+<text x="358" y="1221" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">envelope()</text>
+<text x="358" y="1237" font-size="9" fill="#94a3b8">{code,msg,traceId,data}</text>
+</g>
+</svg></div>
+<p class="graphnote">左起：阶段 0 注册期（import 时一次）→ 阶段 1 编译期（每接口一次）→ 阶段 2 请求期（每请求一次）。图中不含调用树中的重复节点：同一个函数在多处被调用时只画一个节点，由多条入边表示。</p>
+
+<h2><span class="no">03</span>文件级调用图 · 文件为节点，函数为行为</h2>
+<p class="sub">每个文件一个节点，节点内每一行 = 该文件的一个函数（行为）；节点间的箭头 = 跨文件调用，悬停箭头或节点可看具体调用点。<b>同文件内的调用不画线</b>（见 04 节的行内标注），因此没有 U 形回环、也没有连线堆叠。</p>
+<div class="graphwrap wide"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2520 732" width="100%" role="img" aria-label="文件级调用图" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+<defs>
+<marker id="fa0" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#ea580c"/></marker>
+<marker id="fa1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/></marker>
+<marker id="fa2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#2563eb"/></marker>
+<marker id="fa3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/></marker>
+<marker id="fa4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#0891b2"/></marker>
+<marker id="fa5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#64748b"/></marker>
+</defs>
+<text x="30" y="20" font-size="12" font-weight="700" fill="#ea580c">入口层</text>
+<text x="79" y="20" font-size="10" fill="#94a3b8">列 0</text>
+<text x="430" y="20" font-size="12" font-weight="700" fill="#059669">执行层</text>
+<text x="479" y="20" font-size="10" fill="#94a3b8">列 1</text>
+<text x="830" y="20" font-size="12" font-weight="700" fill="#2563eb">算子层</text>
+<text x="879" y="20" font-size="10" fill="#94a3b8">列 2</text>
+<text x="1230" y="20" font-size="12" font-weight="700" fill="#7c3aed">编译层</text>
+<text x="1279" y="20" font-size="10" fill="#94a3b8">列 3</text>
+<text x="1630" y="20" font-size="12" font-weight="700" fill="#0891b2">数据源层</text>
+<text x="1692" y="20" font-size="10" fill="#94a3b8">列 4</text>
+<text x="2030" y="20" font-size="12" font-weight="700" fill="#64748b">基础层</text>
+<text x="2079" y="20" font-size="10" fill="#94a3b8">列 5</text>
+<g><title>web/app.py —— HTTP</title>
+<rect x="30" y="160" width="340" height="99" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="30" y="160" width="4" height="99" rx="2" fill="#ea580c"/>
+<text x="42" y="179" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">web/app.py</text>
+<text x="360" y="179" font-size="9.5" fill="#94a3b8" text-anchor="end">HTTP</text>
+<line x1="40" y1="190" x2="360" y2="190" stroke="#f1f5f9"/>
+<circle cx="46" cy="198" r="2.2" fill="#ea580c" opacity="0.7"/>
+<text x="54" y="202" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">create_app()</text>
+<text x="129.2" y="202" font-size="8.5" fill="#94a3b8">应用工厂，注册路由</text>
+<circle cx="46" cy="217" r="2.2" fill="#ea580c" opacity="0.7"/>
+<text x="54" y="221" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">view()</text>
+<text x="95.6" y="221" font-size="8.5" fill="#94a3b8">请求入口：参数→黑板→执行</text>
+<circle cx="46" cy="236" r="2.2" fill="#ea580c" opacity="0.7"/>
+<text x="54" y="240" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">_register_hooks()</text>
+<text x="157.2" y="240" font-size="8.5" fill="#94a3b8">traceId / 日志 / 错误</text>
+</g>
+<g><title>web/response.py —— 响应</title>
+<rect x="30" y="275" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="30" y="275" width="4" height="80" rx="2" fill="#ea580c"/>
+<text x="42" y="294" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">web/response.py</text>
+<text x="360" y="294" font-size="9.5" fill="#94a3b8" text-anchor="end">响应</text>
+<line x1="40" y1="305" x2="360" y2="305" stroke="#f1f5f9"/>
+<circle cx="46" cy="313" r="2.2" fill="#ea580c" opacity="0.7"/>
+<text x="54" y="317" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">envelope()</text>
+<text x="118.0" y="317" font-size="8.5" fill="#94a3b8">{code,msg,traceId,data}</text>
+<circle cx="46" cy="332" r="2.2" fill="#ea580c" opacity="0.7"/>
+<text x="54" y="336" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">public_msg()</text>
+<text x="129.2" y="336" font-size="8.5" fill="#94a3b8">5xx 信息脱敏</text>
+</g>
+<g><title>runtime.py —— 装配根</title>
+<rect x="430" y="160" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="430" y="160" width="4" height="80" rx="2" fill="#059669"/>
+<text x="442" y="179" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">runtime.py</text>
+<text x="760" y="179" font-size="9.5" fill="#94a3b8" text-anchor="end">装配根</text>
+<line x1="440" y1="190" x2="760" y2="190" stroke="#f1f5f9"/>
+<circle cx="446" cy="198" r="2.2" fill="#059669" opacity="0.7"/>
+<text x="454" y="202" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">build_runtime()</text>
+<text x="546.0" y="202" font-size="8.5" fill="#94a3b8">配置→数据源→编译→执行器</text>
+<circle cx="446" cy="217" r="2.2" fill="#059669" opacity="0.7"/>
+<text x="454" y="221" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">Runtime.close()</text>
+<text x="546.0" y="221" font-size="8.5" fill="#94a3b8">释放线程池与数据源</text>
+</g>
+<g><title>core/executor.py —— 调度</title>
+<rect x="430" y="256" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="430" y="256" width="4" height="80" rx="2" fill="#059669"/>
+<text x="442" y="275" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">core/executor.py</text>
+<text x="760" y="275" font-size="9.5" fill="#94a3b8" text-anchor="end">调度</text>
+<line x1="440" y1="286" x2="760" y2="286" stroke="#f1f5f9"/>
+<circle cx="446" cy="294" r="2.2" fill="#059669" opacity="0.7"/>
+<text x="454" y="298" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">Executor.run()</text>
+<text x="540.4" y="298" font-size="8.5" fill="#94a3b8">按层执行 / 并行 / 超时</text>
+<circle cx="446" cy="313" r="2.2" fill="#059669" opacity="0.7"/>
+<text x="454" y="317" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">run_node()</text>
+<text x="518.0" y="317" font-size="8.5" fill="#94a3b8">唯一执行入口</text>
+</g>
+<g><title>core/context.py —— 黑板</title>
+<rect x="430" y="352" width="340" height="99" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="430" y="352" width="4" height="99" rx="2" fill="#059669"/>
+<text x="442" y="371" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="760" y="371" font-size="9.5" fill="#94a3b8" text-anchor="end">黑板</text>
+<line x1="440" y1="382" x2="760" y2="382" stroke="#f1f5f9"/>
+<circle cx="446" cy="390" r="2.2" fill="#059669" opacity="0.7"/>
+<text x="454" y="394" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">Context.scope()</text>
+<text x="546.0" y="394" font-size="8.5" fill="#94a3b8">上游输出+inputs+request</text>
+<circle cx="446" cy="409" r="2.2" fill="#059669" opacity="0.7"/>
+<text x="454" y="413" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">set_output()</text>
+<text x="529.2" y="413" font-size="8.5" fill="#94a3b8">写输出（加锁）</text>
+<circle cx="446" cy="428" r="2.2" fill="#059669" opacity="0.7"/>
+<text x="454" y="432" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">record()</text>
+<text x="506.8" y="432" font-size="8.5" fill="#94a3b8">耗时 / 错误 / trace</text>
+</g>
+<g><title>operators/registry.py —— 注册表</title>
+<rect x="830" y="160" width="340" height="99" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="830" y="160" width="4" height="99" rx="2" fill="#2563eb"/>
+<text x="842" y="179" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">operators/registry.py</text>
+<text x="1160" y="179" font-size="9.5" fill="#94a3b8" text-anchor="end">注册表</text>
+<line x1="840" y1="190" x2="1160" y2="190" stroke="#f1f5f9"/>
+<circle cx="846" cy="198" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="202" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">register()</text>
+<text x="918.0" y="202" font-size="8.5" fill="#94a3b8">校验并写入 _operators</text>
+<circle cx="846" cy="217" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="221" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">create_operator()</text>
+<text x="957.2" y="221" font-size="8.5" fill="#94a3b8">查表→防注入→校验→build</text>
+<circle cx="846" cy="236" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="240" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">get_operator()</text>
+<text x="940.4" y="240" font-size="8.5" fill="#94a3b8">按名查表</text>
+</g>
+<g><title>operators/base.py —— 算子契约</title>
+<rect x="830" y="275" width="340" height="99" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="830" y="275" width="4" height="99" rx="2" fill="#2563eb"/>
+<text x="842" y="294" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">operators/base.py</text>
+<text x="1160" y="294" font-size="9.5" fill="#94a3b8" text-anchor="end">算子契约</text>
+<line x1="840" y1="305" x2="1160" y2="305" stroke="#f1f5f9"/>
+<circle cx="846" cy="313" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="317" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">Operator.build()</text>
+<text x="951.6" y="317" font-size="8.5" fill="#94a3b8">启动期一次</text>
+<circle cx="846" cy="332" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="336" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">execute()</text>
+<text x="912.4" y="336" font-size="8.5" fill="#94a3b8">每请求一次</text>
+<circle cx="846" cy="351" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="355" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">describe()</text>
+<text x="918.0" y="355" font-size="8.5" fill="#94a3b8">导出 /_operators</text>
+</g>
+<g><title>operators/__init__.py —— 注册入口</title>
+<rect x="830" y="390" width="340" height="61" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="830" y="390" width="4" height="61" rx="2" fill="#2563eb"/>
+<text x="842" y="409" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">operators/__init__.py</text>
+<text x="1160" y="409" font-size="9.5" fill="#94a3b8" text-anchor="end">注册入口</text>
+<line x1="840" y1="420" x2="1160" y2="420" stroke="#f1f5f9"/>
+<circle cx="846" cy="428" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="432" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">模块导入</text>
+<text x="884.4" y="432" font-size="8.5" fill="#94a3b8">导入五个分类包</text>
+</g>
+<g><title>external/uredis/redisGet.py —— 示例算子</title>
+<rect x="830" y="467" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="830" y="467" width="4" height="80" rx="2" fill="#2563eb"/>
+<text x="842" y="486" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="1160" y="486" font-size="9.5" fill="#94a3b8" text-anchor="end">示例算子</text>
+<line x1="840" y1="497" x2="1160" y2="497" stroke="#f1f5f9"/>
+<circle cx="846" cy="505" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="509" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">RedisGet.build()</text>
+<text x="951.6" y="509" font-size="8.5" fill="#94a3b8">取数据源 + 校验配置</text>
+<circle cx="846" cy="524" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="528" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">RedisGet.execute()</text>
+<text x="962.8" y="528" font-size="8.5" fill="#94a3b8">读键 + 按 format 解析</text>
+</g>
+<g><title>external/uredis/parse.py —— 解析</title>
+<rect x="830" y="563" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="830" y="563" width="4" height="80" rx="2" fill="#2563eb"/>
+<text x="842" y="582" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/parse.py</text>
+<text x="1160" y="582" font-size="9.5" fill="#94a3b8" text-anchor="end">解析</text>
+<line x1="840" y1="593" x2="1160" y2="593" stroke="#f1f5f9"/>
+<circle cx="846" cy="601" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="605" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">check_config()</text>
+<text x="940.4" y="605" font-size="8.5" fill="#94a3b8">校验 fields/delimiter</text>
+<circle cx="846" cy="620" r="2.2" fill="#2563eb" opacity="0.7"/>
+<text x="854" y="624" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">parse_value()</text>
+<text x="934.8" y="624" font-size="8.5" fill="#94a3b8">raw / json / csv</text>
+</g>
+<g><title>core/builder.py —— 编译器</title>
+<rect x="1230" y="160" width="340" height="156" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1230" y="160" width="4" height="156" rx="2" fill="#7c3aed"/>
+<text x="1242" y="179" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="1560" y="179" font-size="9.5" fill="#94a3b8" text-anchor="end">编译器</text>
+<line x1="1240" y1="190" x2="1560" y2="190" stroke="#f1f5f9"/>
+<circle cx="1246" cy="198" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="202" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">Builder.build()</text>
+<text x="1346.0" y="202" font-size="8.5" fill="#94a3b8">逐 group / api 编译</text>
+<circle cx="1246" cy="217" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="221" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">build_api()</text>
+<text x="1323.6" y="221" font-size="8.5" fill="#94a3b8">分层 / 定结果节点</text>
+<circle cx="1246" cy="236" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="240" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">compile_node()</text>
+<text x="1340.4" y="240" font-size="8.5" fill="#94a3b8">编译单个节点</text>
+<circle cx="1246" cy="255" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="259" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">_compile_config()</text>
+<text x="1357.2" y="259" font-size="8.5" fill="#94a3b8">拆 static/dynamic/raw</text>
+<circle cx="1246" cy="274" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="278" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">PlanNode.resolve_args()</text>
+<text x="1390.8" y="278" font-size="8.5" fill="#94a3b8">请求期渲染 dynamic</text>
+<circle cx="1246" cy="293" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="297" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">BuildEnv.datasource()</text>
+<text x="1379.6" y="297" font-size="8.5" fill="#94a3b8">解析数据源 + 依赖探测</text>
+</g>
+<g><title>core/inputs.py —— 入参</title>
+<rect x="1230" y="332" width="340" height="61" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1230" y="332" width="4" height="61" rx="2" fill="#7c3aed"/>
+<text x="1242" y="351" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">core/inputs.py</text>
+<text x="1560" y="351" font-size="9.5" fill="#94a3b8" text-anchor="end">入参</text>
+<line x1="1240" y1="362" x2="1560" y2="362" stroke="#f1f5f9"/>
+<circle cx="1246" cy="370" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="374" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">InputSchema.parse()</text>
+<text x="1368.4" y="374" font-size="8.5" fill="#94a3b8">校验 / 转换 / 默认值</text>
+</g>
+<g><title>core/graph.py —— DAG</title>
+<rect x="1230" y="409" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1230" y="409" width="4" height="80" rx="2" fill="#7c3aed"/>
+<text x="1242" y="428" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">core/graph.py</text>
+<text x="1560" y="428" font-size="9.5" fill="#94a3b8" text-anchor="end">DAG</text>
+<line x1="1240" y1="439" x2="1560" y2="439" stroke="#f1f5f9"/>
+<circle cx="1246" cy="447" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="451" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">Graph.levels()</text>
+<text x="1340.4" y="451" font-size="8.5" fill="#94a3b8">拓扑分层</text>
+<circle cx="1246" cy="466" r="2.2" fill="#7c3aed" opacity="0.7"/>
+<text x="1254" y="470" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">ancestors()</text>
+<text x="1323.6" y="470" font-size="8.5" fill="#94a3b8">上游集合</text>
+</g>
+<g><title>datasources/__init__.py —— 数据源管理</title>
+<rect x="1630" y="160" width="340" height="99" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1630" y="160" width="4" height="99" rx="2" fill="#0891b2"/>
+<text x="1642" y="179" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/__init__.py</text>
+<text x="1960" y="179" font-size="9.5" fill="#94a3b8" text-anchor="end">数据源管理</text>
+<line x1="1640" y1="190" x2="1960" y2="190" stroke="#f1f5f9"/>
+<circle cx="1646" cy="198" r="2.2" fill="#0891b2" opacity="0.7"/>
+<text x="1654" y="202" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">from_config()</text>
+<text x="1734.8" y="202" font-size="8.5" fill="#94a3b8">实例化全部数据源</text>
+<circle cx="1646" cy="217" r="2.2" fill="#0891b2" opacity="0.7"/>
+<text x="1654" y="221" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">create_datasource()</text>
+<text x="1768.4" y="221" font-size="8.5" fill="#94a3b8">构造 + check()</text>
+<circle cx="1646" cy="236" r="2.2" fill="#0891b2" opacity="0.7"/>
+<text x="1654" y="240" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">resolve()</text>
+<text x="1712.4" y="240" font-size="8.5" fill="#94a3b8">按 (name, kind) 匹配</text>
+</g>
+<g><title>datasources/redis.py —— kv 数据源</title>
+<rect x="1630" y="275" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1630" y="275" width="4" height="80" rx="2" fill="#0891b2"/>
+<text x="1642" y="294" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/redis.py</text>
+<text x="1960" y="294" font-size="9.5" fill="#94a3b8" text-anchor="end">kv 数据源</text>
+<line x1="1640" y1="305" x2="1960" y2="305" stroke="#f1f5f9"/>
+<circle cx="1646" cy="313" r="2.2" fill="#0891b2" opacity="0.7"/>
+<text x="1654" y="317" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">check_dependencies()</text>
+<text x="1774.0" y="317" font-size="8.5" fill="#94a3b8">find_spec 探测</text>
+<circle cx="1646" cy="332" r="2.2" fill="#0891b2" opacity="0.7"/>
+<text x="1654" y="336" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">get() / hgetall()</text>
+<text x="1757.2" y="336" font-size="8.5" fill="#94a3b8">懒加载取数</text>
+</g>
+<g><title>config/loader.py —— 配置</title>
+<rect x="1630" y="371" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1630" y="371" width="4" height="80" rx="2" fill="#0891b2"/>
+<text x="1642" y="390" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">config/loader.py</text>
+<text x="1960" y="390" font-size="9.5" fill="#94a3b8" text-anchor="end">配置</text>
+<line x1="1640" y1="401" x2="1960" y2="401" stroke="#f1f5f9"/>
+<circle cx="1646" cy="409" r="2.2" fill="#0891b2" opacity="0.7"/>
+<text x="1654" y="413" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">load_config()</text>
+<text x="1734.8" y="413" font-size="8.5" fill="#94a3b8">读 YAML / 结构校验</text>
+<circle cx="1646" cy="428" r="2.2" fill="#0891b2" opacity="0.7"/>
+<text x="1654" y="432" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">load_node()</text>
+<text x="1723.6" y="432" font-size="8.5" fill="#94a3b8">校验图节点</text>
+</g>
+<g><title>spec.py —— 字段契约</title>
+<rect x="2030" y="160" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="2030" y="160" width="4" height="80" rx="2" fill="#64748b"/>
+<text x="2042" y="179" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">spec.py</text>
+<text x="2360" y="179" font-size="9.5" fill="#94a3b8" text-anchor="end">字段契约</text>
+<line x1="2040" y1="190" x2="2360" y2="190" stroke="#f1f5f9"/>
+<circle cx="2046" cy="198" r="2.2" fill="#64748b" opacity="0.7"/>
+<text x="2054" y="202" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">validate()</text>
+<text x="2118.0" y="202" font-size="8.5" fill="#94a3b8">按 spec 校验补默认</text>
+<circle cx="2046" cy="217" r="2.2" fill="#64748b" opacity="0.7"/>
+<text x="2054" y="221" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">is_template()</text>
+<text x="2134.8" y="221" font-size="8.5" fill="#94a3b8">模板探测</text>
+</g>
+<g><title>errors.py —— 错误</title>
+<rect x="2030" y="256" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="2030" y="256" width="4" height="80" rx="2" fill="#64748b"/>
+<text x="2042" y="275" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">errors.py</text>
+<text x="2360" y="275" font-size="9.5" fill="#94a3b8" text-anchor="end">错误</text>
+<line x1="2040" y1="286" x2="2360" y2="286" stroke="#f1f5f9"/>
+<circle cx="2046" cy="294" r="2.2" fill="#64748b" opacity="0.7"/>
+<text x="2054" y="298" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">ConfigError/ExecError</text>
+<text x="2179.6" y="298" font-size="8.5" fill="#94a3b8">错误分层</text>
+<circle cx="2046" cy="313" r="2.2" fill="#64748b" opacity="0.7"/>
+<text x="2054" y="317" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">ErrorCollector</text>
+<text x="2140.4" y="317" font-size="8.5" fill="#94a3b8">启动期错误汇总</text>
+</g>
+<g><title>core/template.py —— 模板引擎</title>
+<rect x="2030" y="352" width="340" height="80" rx="7" fill="#fff" stroke="#e2e8f0"/>
+<rect x="2030" y="352" width="4" height="80" rx="2" fill="#64748b"/>
+<text x="2042" y="371" font-size="11" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">core/template.py</text>
+<text x="2360" y="371" font-size="9.5" fill="#94a3b8" text-anchor="end">模板引擎</text>
+<line x1="2040" y1="382" x2="2360" y2="382" stroke="#f1f5f9"/>
+<circle cx="2046" cy="390" r="2.2" fill="#64748b" opacity="0.7"/>
+<text x="2054" y="394" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">compile_template()</text>
+<text x="2162.8" y="394" font-size="8.5" fill="#94a3b8">值 → Template</text>
+<circle cx="2046" cy="409" r="2.2" fill="#64748b" opacity="0.7"/>
+<text x="2054" y="413" font-size="9.5" fill="#334155" font-family="ui-monospace,Menlo,Consolas,monospace">Template.render()</text>
+<text x="2157.2" y="413" font-size="8.5" fill="#94a3b8">Jinja2 沙箱求值</text>
+</g>
+<path class="flink" d="M 370.0 191.5 H 380.0 V 200.0 H 430.0" fill="none" stroke="#ea580c" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa0)"><title>web/app.py → runtime.py：create_app → build_runtime</title></path>
+<text x="400.0" y="191.8" font-size="8.5" fill="#ea580c" text-anchor="middle" opacity="0.85">create_app → build_runtime</text>
+<path class="flink" d="M 370.0 218.5 H 382.0 V 30.0 H 1218.0 V 358.0 H 1230.0" fill="none" stroke="#ea580c" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa0)"><title>web/app.py → core/inputs.py：view → parse</title></path>
+<text x="800.0" y="26.0" font-size="8.5" fill="#ea580c" text-anchor="middle" opacity="0.85">view → parse</text>
+<path class="flink" d="M 370.0 200.5 H 390.0 V 291.5 H 430.0" fill="none" stroke="#ea580c" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa0)"><title>web/app.py → core/executor.py：view → run</title></path>
+<text x="400.0" y="242.0" font-size="8.5" fill="#ea580c" text-anchor="middle" opacity="0.85">view → run</text>
+<path class="flink" d="M 370.0 227.5 H 420.0 V 397.0 H 430.0" fill="none" stroke="#ea580c" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa0)"><title>web/app.py → core/context.py：view → Context</title></path>
+<text x="400.0" y="308.2" font-size="8.5" fill="#ea580c" text-anchor="middle" opacity="0.85">view → Context</text>
+<path class="flink" d="M 770.0 213.5 H 782.0 V 43.0 H 1618.0 V 411.0 H 1630.0" fill="none" stroke="#059669" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa1)"><title>runtime.py → config/loader.py：build_runtime → load_config</title></path>
+<text x="1200.0" y="39.0" font-size="8.5" fill="#059669" text-anchor="middle" opacity="0.85">build_runtime → load_config</text>
+<path class="flink" d="M 770.0 186.5 H 782.0 V 56.0 H 1618.0 V 205.0 H 1630.0" fill="none" stroke="#059669" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa1)"><title>runtime.py → datasources/__init__.py：build_runtime → from_config</title></path>
+<text x="1200.0" y="52.0" font-size="8.5" fill="#059669" text-anchor="middle" opacity="0.85">build_runtime → from_config</text>
+<path class="flink" d="M 770.0 195.5 H 782.0 V 69.0 H 1218.0 V 229.0 H 1230.0" fill="none" stroke="#059669" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa1)"><title>runtime.py → core/builder.py：build_runtime → Builder.build</title></path>
+<text x="1000.0" y="65.0" font-size="8.5" fill="#059669" text-anchor="middle" opacity="0.85">build_runtime → Builder.build</text>
+<path class="flink" d="M 770.0 287.0 H 782.0 V 82.0 H 1218.0 V 238.0 H 1230.0" fill="none" stroke="#059669" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa1)"><title>core/executor.py → core/builder.py：run_node → resolve_args</title></path>
+<text x="1000.0" y="78.0" font-size="8.5" fill="#059669" text-anchor="middle" opacity="0.85">run_node → resolve_args</text>
+<path class="flink" d="M 770.0 305.0 H 815.0 V 507.0 H 830.0" fill="none" stroke="#059669" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa1)"><title>core/executor.py → external/uredis/redisGet.py：run_node → execute</title></path>
+<text x="800.0" y="402.0" font-size="8.5" fill="#059669" text-anchor="middle" opacity="0.85">run_node → execute</text>
+<path class="flink" d="M 1570.0 220.0 H 1582.0 V 689.0 H 1182.0 V 209.5 H 830.0" fill="none" stroke="#7c3aed" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa3)"><title>core/builder.py → operators/registry.py：compile_node → create_operator</title></path>
+<text x="1200.0" y="685.0" font-size="8.5" fill="#7c3aed" text-anchor="middle" opacity="0.85">compile_node → create_operator</text>
+<path class="flink" d="M 1570.0 247.0 H 1582.0 V 95.0 H 2018.0 V 392.0 H 2030.0" fill="none" stroke="#7c3aed" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa3)"><title>core/builder.py → core/template.py：compile_template / render</title></path>
+<text x="1800.0" y="91.0" font-size="8.5" fill="#7c3aed" text-anchor="middle" opacity="0.85">compile_template / render</text>
+<path class="flink" d="M 1570.0 229.0 H 1590.0 V 214.0 H 1630.0" fill="none" stroke="#7c3aed" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa3)"><title>core/builder.py → datasources/__init__.py：BuildEnv.datasource → resolve</title></path>
+<text x="1600.0" y="217.5" font-size="8.5" fill="#7c3aed" text-anchor="middle" opacity="0.85">BuildEnv.datasource → resolve</text>
+<path class="flink" d="M 1170.0 205.0 H 1182.0 V 108.0 H 2018.0 V 200.0 H 2030.0" fill="none" stroke="#2563eb" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa2)"><title>operators/registry.py → spec.py：create_operator → validate</title></path>
+<text x="1600.0" y="104.0" font-size="8.5" fill="#2563eb" text-anchor="middle" opacity="0.85">create_operator → validate</text>
+<path class="flink" d="M 1170.0 498.0 H 1185.0 V 247.0 H 1230.0" fill="none" stroke="#2563eb" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa2)"><title>external/uredis/redisGet.py → core/builder.py：build → BuildEnv.datasource</title></path>
+<text x="1200.0" y="368.5" font-size="8.5" fill="#2563eb" text-anchor="middle" opacity="0.85">build → BuildEnv.datasource</text>
+<path class="flink" d="M 1170.0 507.0 H 1182.0 V 121.0 H 1618.0 V 319.5 H 1630.0" fill="none" stroke="#2563eb" stroke-width="1.3" stroke-opacity="0.55" marker-end="url(#fa2)"><title>external/uredis/redisGet.py → datasources/redis.py：execute → get</title></path>
+<text x="1400.0" y="117.0" font-size="8.5" fill="#2563eb" text-anchor="middle" opacity="0.85">execute → get</text>
+</svg></div>
+<p class="graphnote">横向 6 列：入口层 → 执行层 → 算子层 → 编译层 → 数据源层 → 基础层。跨多列的边走顶部走廊、反向边走底部走廊，每条边单独一条通道，互不重叠。</p>
+
+<h2><span class="no">04</span>数据是怎么流的 · counter/merge</h2>
+<p class="lead">框 = 一个算子：第一行「id · 算子」，第二行是它输出的数据形态，第三行写进黑板哪个 key；箭头上的 <code>{{ }}</code> 就是数据的来源。</p>
+<div class="graphwrap wide"><svg width="1436pt" height="201pt"
+ viewBox="0.00 0.00 1436.00 201.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(8.64 192.64)">
+<title>dataflow</title>
+<g id="clust1" class="cluster">
+<title>cluster_in</title>
+<path fill="#f8fafc" stroke="#e2e8f0" d="M20,-18C20,-18 144,-18 144,-18 150,-18 156,-24 156,-30 156,-30 156,-95 156,-95 156,-101 150,-107 144,-107 144,-107 20,-107 20,-107 14,-107 8,-101 8,-95 8,-95 8,-30 8,-30 8,-24 14,-18 20,-18"/>
+<text xml:space="preserve" text-anchor="start" x="72.25" y="-94.5" font-family="PingFang SC" font-weight="bold" font-size="10.00">请求</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_read</title>
+<path fill="#eff6ff" stroke="#bfdbfe" d="M255.25,-17C255.25,-17 439.25,-17 439.25,-17 445.25,-17 451.25,-23 451.25,-29 451.25,-29 451.25,-164 451.25,-164 451.25,-170 445.25,-176 439.25,-176 439.25,-176 255.25,-176 255.25,-176 249.25,-176 243.25,-170 243.25,-164 243.25,-164 243.25,-29 243.25,-29 243.25,-23 249.25,-17 255.25,-17"/>
+<text xml:space="preserve" text-anchor="start" x="307.5" y="-163.5" font-family="PingFang SC" font-weight="bold" font-size="10.00">读数据 · external</text>
+</g>
+<g id="clust3" class="cluster">
+<title>cluster_work</title>
+<path fill="#f5f3ff" stroke="#ddd6fe" d="M513.75,-20C513.75,-20 1112,-20 1112,-20 1118,-20 1124,-26 1124,-32 1124,-32 1124,-99 1124,-99 1124,-105 1118,-111 1112,-111 1112,-111 513.75,-111 513.75,-111 507.75,-111 501.75,-105 501.75,-99 501.75,-99 501.75,-32 501.75,-32 501.75,-26 507.75,-20 513.75,-20"/>
+<text xml:space="preserve" text-anchor="start" x="738.62" y="-98.5" font-family="PingFang SC" font-weight="bold" font-size="10.00">加工 · transformer / aggregate</text>
+</g>
+<g id="clust4" class="cluster">
+<title>cluster_out</title>
+<path fill="#ecfdf5" stroke="#a7f3d0" d="M1208.25,-20C1208.25,-20 1398.25,-20 1398.25,-20 1404.25,-20 1410.25,-26 1410.25,-32 1410.25,-32 1410.25,-99 1410.25,-99 1410.25,-105 1404.25,-111 1398.25,-111 1398.25,-111 1208.25,-111 1208.25,-111 1202.25,-111 1196.25,-105 1196.25,-99 1196.25,-99 1196.25,-32 1196.25,-32 1196.25,-26 1202.25,-20 1208.25,-20"/>
+<text xml:space="preserve" text-anchor="start" x="1293.5" y="-98.5" font-family="PingFang SC" font-weight="bold" font-size="10.00">输出</text>
+</g>
+<!-- inputs -->
+<g id="node1" class="node">
+<title>inputs</title>
+<text xml:space="preserve" text-anchor="start" x="25" y="-63.35" font-family="PingFang SC" font-weight="bold" font-size="9.50">inputs</text>
+<text xml:space="preserve" text-anchor="start" x="25" y="-46.12" font-family="Menlo" font-size="9.50" fill="#0f172a">date = &quot;2026&#45;11&#45;04&quot;</text>
+<text xml:space="preserve" text-anchor="start" x="25" y="-32.88" font-family="Menlo" font-size="9.50" fill="#0f172a">cnt = 8</text>
+</g>
+<!-- a -->
+<g id="node2" class="node">
+<title>a</title>
+<text xml:space="preserve" text-anchor="start" x="260.25" y="-131.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">a · redisGet</text>
+<text xml:space="preserve" text-anchor="start" x="260.25" y="-114.5" font-family="Menlo" font-size="9.50" fill="#0f172a">{date:&quot;2026&#45;11&#45;04&quot;, cnt:&quot;10&quot;}</text>
+<text xml:space="preserve" text-anchor="start" x="260.25" y="-101.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;a&quot;]</text>
+</g>
+<!-- inputs&#45;&gt;a -->
+<g id="edge1" class="edge">
+<title>inputs&#45;&gt;a</title>
+<path fill="none" stroke="#94a3b8" d="M147.74,-67.72C176.99,-75.28 212.26,-84.39 244.9,-92.82"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="244.11,-94.61 249.92,-94.12 245.08,-90.88 244.11,-94.61"/>
+<text xml:space="preserve" text-anchor="middle" x="199.62" y="-91.44" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ inputs.date }}</text>
+</g>
+<!-- b -->
+<g id="node3" class="node">
+<title>b</title>
+<text xml:space="preserve" text-anchor="start" x="263.25" y="-63.73" font-family="PingFang SC" font-weight="bold" font-size="9.50">b · redisGet</text>
+<text xml:space="preserve" text-anchor="start" x="263.25" y="-46.5" font-family="Menlo" font-size="9.50" fill="#0f172a">{date:&quot;2026&#45;11&#45;05&quot;, cnt:&quot;7&quot;}</text>
+<text xml:space="preserve" text-anchor="start" x="263.25" y="-33.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;b&quot;]</text>
+</g>
+<!-- inputs&#45;&gt;b -->
+<g id="edge2" class="edge">
+<title>inputs&#45;&gt;b</title>
+<path fill="none" stroke="#94a3b8" d="M147.74,-51C177.85,-51 214.33,-51 247.75,-51"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="247.38,-52.93 252.88,-51 247.38,-49.08 247.38,-52.93"/>
+<text xml:space="preserve" text-anchor="middle" x="199.62" y="-55.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ inputs.date }}</text>
+</g>
+<!-- filtered -->
+<g id="node6" class="node">
+<title>filtered</title>
+<text xml:space="preserve" text-anchor="start" x="1024.5" y="-66.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">filtered · rowFilter</text>
+<text xml:space="preserve" text-anchor="start" x="1024.5" y="-49.5" font-family="Menlo" font-size="9.50" fill="#0f172a">[{sum:10}]</text>
+<text xml:space="preserve" text-anchor="start" x="1024.5" y="-36.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;filtered&quot;]</text>
+</g>
+<!-- inputs&#45;&gt;filtered -->
+<g id="edge3" class="edge">
+<title>inputs&#45;&gt;filtered</title>
+<path fill="none" stroke="#94a3b8" d="M147.78,-31.28C200.65,-16.93 277.58,0 346.25,0 346.25,0 346.25,0 858.5,0 910.85,0 968.31,-16.48 1009.25,-31.23"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1008.43,-32.98 1014.26,-33.07 1009.75,-29.37 1008.43,-32.98"/>
+<text xml:space="preserve" text-anchor="middle" x="611.75" y="-4.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ inputs.cnt }}</text>
+</g>
+<!-- cast -->
+<g id="node4" class="node">
+<title>cast</title>
+<text xml:space="preserve" text-anchor="start" x="518.75" y="-66.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">cast · numberCast</text>
+<text xml:space="preserve" text-anchor="start" x="518.75" y="-49.5" font-family="Menlo" font-size="9.50" fill="#0f172a">[{date, cnt:10}, {date, cnt:7}]</text>
+<text xml:space="preserve" text-anchor="start" x="518.75" y="-36.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;cast&quot;]</text>
+</g>
+<!-- a&#45;&gt;cast -->
+<g id="edge4" class="edge">
+<title>a&#45;&gt;cast</title>
+<path fill="none" stroke="#94a3b8" d="M443.02,-95.53C462.55,-90.7 483.24,-85.57 503.19,-80.63"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="503.57,-82.52 508.45,-79.33 502.65,-78.79 503.57,-82.52"/>
+<text xml:space="preserve" text-anchor="middle" x="476.5" y="-92.85" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ a }}</text>
+</g>
+<!-- b&#45;&gt;cast -->
+<g id="edge5" class="edge">
+<title>b&#45;&gt;cast</title>
+<path fill="none" stroke="#94a3b8" d="M440.06,-52.05C460.47,-52.28 482.29,-52.53 503.26,-52.77"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="503.01,-54.69 508.53,-52.83 503.05,-50.84 503.01,-54.69"/>
+<text xml:space="preserve" text-anchor="middle" x="476.5" y="-56.99" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ b }}</text>
+</g>
+<!-- grouped -->
+<g id="node5" class="node">
+<title>grouped</title>
+<text xml:space="preserve" text-anchor="start" x="800.5" y="-66.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">grouped · groupBy</text>
+<text xml:space="preserve" text-anchor="start" x="800.5" y="-49.5" font-family="Menlo" font-size="9.50" fill="#0f172a">[{sum:10}, {sum:7}]</text>
+<text xml:space="preserve" text-anchor="start" x="800.5" y="-36.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;grouped&quot;]</text>
+</g>
+<!-- cast&#45;&gt;grouped -->
+<g id="edge6" class="edge">
+<title>cast&#45;&gt;grouped</title>
+<path fill="none" stroke="#94a3b8" d="M713.65,-54C737.51,-54 762.47,-54 784.73,-54"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="784.54,-55.93 790.04,-54 784.54,-52.08 784.54,-55.93"/>
+<text xml:space="preserve" text-anchor="middle" x="752.62" y="-58.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ cast }}</text>
+</g>
+<!-- grouped&#45;&gt;filtered -->
+<g id="edge7" class="edge">
+<title>grouped&#45;&gt;filtered</title>
+<path fill="none" stroke="#94a3b8" d="M923.48,-54C950.9,-54 982.51,-54 1008.87,-54"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1008.79,-55.93 1014.29,-54 1008.79,-52.08 1008.79,-55.93"/>
+<text xml:space="preserve" text-anchor="middle" x="969.5" y="-58.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ grouped }}</text>
+</g>
+<!-- resp -->
+<g id="node7" class="node">
+<title>resp</title>
+<text xml:space="preserve" text-anchor="start" x="1213.25" y="-66.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">respBuilder</text>
+<text xml:space="preserve" text-anchor="start" x="1213.25" y="-49.5" font-family="Menlo" font-size="9.50" fill="#0f172a">data: [{date:&quot;11&#45;04&quot;, sum:10}]</text>
+<text xml:space="preserve" text-anchor="start" x="1213.25" y="-36.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">结果节点 → 响应 data</text>
+</g>
+<!-- filtered&#45;&gt;resp -->
+<g id="edge8" class="edge">
+<title>filtered&#45;&gt;resp</title>
+<path fill="none" stroke="#94a3b8" d="M1115.83,-54C1139.67,-54 1169.27,-54 1197.82,-54"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1197.65,-55.93 1203.15,-54 1197.65,-52.08 1197.65,-55.93"/>
+<text xml:space="preserve" text-anchor="middle" x="1160.12" y="-58.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ filtered }}</text>
+</g>
+</g>
+</svg></div>
+<p class="graphnote">读入 → 数值化 → 分组求和 → 过滤 → 输出；每个节点的输出都进 <code>Context._outputs</code>，下游按 id 取。</p>
+
+<h2><span class="no">05</span>配置 → 代码 对照</h2>
+<section class="grid2">
+  <div>
+    <pre><span class="c"># conf/demo_counter_merge.yaml（节点 a）</span>
+- <span class="k">id</span>: a
+  <span class="k">name</span>: <span class="v">"redisGet"</span>          <span class="c"># → get_operator()</span>
+  <span class="k">depends</span>: []             <span class="c"># → Graph.levels()</span>
+  <span class="k">config</span>:
+    <span class="k">dataSource</span>: <span class="v">"mdnf"</span>      <span class="c"># → validate() / build()</span>
+    <span class="k">key</span>: <span class="v">"counter|daily|a|{{ inputs.date }}"</span>
+                             <span class="c"># → dynamic，编译为 Template</span>
+    <span class="k">format</span>: csv            <span class="c"># → validate(choices)</span>
+    <span class="k">fields</span>: [date, cnt]    <span class="c"># → parse.check_config()</span>
+    <span class="k">default</span>: {date: "", cnt: "0"}</pre>
+  </div>
+  <div>
+    <pre><span class="c"># 编译期产物（概念示意，非仓库文件）</span>
+PlanNode(
+  id=<span class="v">"a"</span>,
+  op=RedisGet(...),            <span class="c"># spec 校验后的实例</span>
+  depends=(),
+  static={dataSource:<span class="v">"mdnf"</span>, format:<span class="v">"csv"</span>,
+          fields:[<span class="v">"date"</span>,<span class="v">"cnt"</span>], default:{...}},
+  dynamic={key: _Expr("inputs.date")},
+  desc=<span class="v">"读第一个 key 的日期计数"</span>,
+)
+
+<span class="c"># 请求期：resolve_args 渲染 → execute</span>
+args["key"] = <span class="v">"counter|daily|a|2026-11-04"</span>
+ds.get(key) = <span class="v">"2026-11-04|10"</span>
+ctx.output("a") = {date: <span class="v">"2026-11-04"</span>, cnt: <span class="v">"10"</span>}</pre>
+  </div>
+</section>
+
+<h2><span class="no">06</span>核心文件 / 函数速查</h2>
+<section>
+<table>
+  <tr><th>文件</th><th>关键函数 / 类</th><th>职责</th><th>阶段</th></tr>
+  <tr><td>lowcode/spec.py</td><td>Field · validate · check_type · is_template · child</td><td>所有 config 的字段声明、类型校验、模板探测、报错定位</td><td>基础</td></tr>
+  <tr><td>lowcode/errors.py</td><td>LowcodeError · ConfigError · ExecError · BizError · ErrorCollector</td><td>错误分层与启动期错误汇总</td><td>基础</td></tr>
+  <tr><td>operators/registry.py</td><td>register · get_operator · create_operator · list_operators</td><td>算子注册表与工厂；拒绝在非 dynamic/raw 字段写模板</td><td>注册 / 编译</td></tr>
+  <tr><td>operators/base.py</td><td>Operator.build · execute · describe · config_error</td><td>算子契约：启动期一次 / 每请求一次；不得原地修改 args 与上游输出</td><td>契约</td></tr>
+  <tr><td>operators/__init__.py</td><td>五个分类包的末尾导入</td><td>导入即注册，无需显式装配步骤</td><td>注册</td></tr>
+  <tr><td>config/loader.py · models.py</td><td>load_config · load_node · NODE_SPEC / API_SPEC</td><td>YAML → ServerDef / ApiDef / NodeDef</td><td>编译</td></tr>
+  <tr><td>core/builder.py</td><td>Builder.build · build_api · compile_node · _compile_config · _check_refs · PlanNode.resolve_args</td><td>编译ApiPlan；每请求把 dynamic 字段渲染成 args</td><td>编译 / 请求</td></tr>
+  <tr><td>core/template.py</td><td>compile_template · Template.render · _analyze</td><td>Jinja2 沙箱模板；整串单表达式保留原生类型；静态分析引用名</td><td>编译 / 请求</td></tr>
+  <tr><td>core/graph.py</td><td>Graph.levels · ancestors</td><td>DAG 分层、环检测、可达性</td><td>编译</td></tr>
+  <tr><td>core/executor.py</td><td>Executor.run · _run_parallel · run_node</td><td>逐层执行、并行、错误加节点前缀、finally 记 trace</td><td>请求</td></tr>
+  <tr><td>core/context.py</td><td>scope · set_output · output · record · remaining</td><td>请求级黑板（加锁：并行层共享）</td><td>请求</td></tr>
+  <tr><td>runtime.py</td><td>build_runtime · Runtime.close</td><td>唯一装配点；Web 与 CLI 只依赖它</td><td>入口</td></tr>
+  <tr><td>web/app.py · response.py</td><td>create_app · view · _register_hooks · envelope</td><td>HTTP 路由、参数、统一响应、k=v 日志与错误处理</td><td>请求</td></tr>
+  <tr><td>datasources/__init__.py</td><td>DataSource · DataSourceManager.from_config · resolve · check_dependencies</td><td>按 kind（sql/http/kv）取数据源；缺包在编译接口时暴露</td><td>编译 / 请求</td></tr>
+</table>
+</section>
+
+<h2><span class="no">07</span>关键约束（决定扩展方式）</h2>
+<section class="card">
+  <ul class="rules">
+    <li><b>三个时机</b>：注册（import 一次）→ 编译（每接口一次：<code>validate</code> / <code>build</code> / <code>compile_template</code>）→ 请求（每次：<code>resolve_args</code> / <code>execute</code>）。把能提前做的事放进 <code>build()</code>。</li>
+    <li><b>三类 config 字段</b>：<code>static</code>（原样）、<code>dynamic</code>（框架编译模板、校验引用、每请求渲染）、<code>raw</code>（算子自己渲染，框架不编译不校验，如 <code>templateMap.template</code>）。</li>
+    <li><b>引用安全</b>：模板只能引用 <code>inputs</code> / <code>request</code> / 上游节点 id 与 Jinja 全局；<code>inputs.xxx</code> 必须已声明，否则启动期报错。</li>
+    <li><b>不得原地修改</b> <code>args</code> 与上游输出（节点间、请求间共享）；算子测试框架的 <code>_check_untouched</code> 会强制校验。</li>
+    <li><b>错误分层</b>：<code>ConfigError</code> 启动期 / <code>ExecError</code> 运行期 500（带 <code>[节点id]</code> 前缀）/ <code>BizError</code> 业务码原样透出 / <code>ParamError</code> 400。</li>
+    <li><b>测试同路径</b>：<code>lowcode/testing/suite.py::run_case()</code> 同样调用 <code>compile_node()</code> + <code>Executor.run_node()</code>，算子用例与线上走同一条链路。</li>
+  </ul>
+  <p class="note">查看方式：浏览器直接打开本文件（无外部依赖）；命令行可用 <code>python3 -m lowcode operators</code> 看已注册算子、<code>python3 -m lowcode explain -c conf</code> 看每个接口的编译产物。</p>
+</section>
+
+<footer>lowcode · 算子生命周期与核心架构图 · 依据当前仓库代码绘制（示例算子：redisGet）</footer>
+</div>
+</body>
+</html>

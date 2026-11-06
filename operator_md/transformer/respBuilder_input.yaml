@@ -1,0 +1,84 @@
+# respBuilder 用例集
+Assemble:
+  desc: 把多个上游的输出组装成一个对象（对应 datamore_lite 的 respMergeBuilder）
+  upstream:
+    total: {n: 2}
+    rows: [{id: 1}, {id: 2}]
+  expect:
+    output: {total: 2, list: [{id: 1}, {id: 2}]}
+
+Passthrough:
+  desc: 模板只有一个表达式时原样透传上游（对应 datamore_lite 的 respBuilder）
+  config: {data: "{{ rows }}"}
+  upstream: {rows: [{id: 1}]}
+  expect: {output: [{id: 1}]}
+
+Native_Type_Vs_Text:
+  desc: 整串一个表达式保留原生类型；与文字混排时渲染为字符串；支持算术表达式
+  config:
+    data:
+      page: "{{ inputs.page }}"
+      label: "第 {{ inputs.page }} 页"
+      offset: "{{ (inputs.page - 1) * inputs.size }}"
+      flag: "{{ inputs.page > 1 }}"
+  inputs: {page: 3, size: 10}
+  expect:
+    output: {page: 3, label: 第 3 页, offset: 20, flag: true}
+
+Static_Template:
+  desc: 不含模板的值原样输出（启动期即确定，请求时不再渲染）
+  config:
+    data: {ok: true, version: 1, tags: [a, b], none: null}
+  expect:
+    output: {ok: true, version: 1, tags: [a, b], none: null}
+
+Nested_Structure:
+  desc: 任意嵌套的 dict / list，逐层渲染
+  config:
+    data:
+      meta: {count: "{{ rows | length }}", first: "{{ rows.0.id }}"}
+      ids: ["{{ rows.0.id }}", "{{ rows.1.id }}"]
+  upstream: {rows: [{id: 1}, {id: 2}]}
+  expect:
+    output: {meta: {count: 2, first: 1}, ids: [1, 2]}
+
+Mapping_Key_First:
+  desc: 字典优先按键取值：{{ row.items }} 取名为 items 的列，而不是 dict.items 方法
+  config: {data: {items: "{{ row.items }}", keys: "{{ row['keys'] }}"}}
+  upstream: {row: {items: 3, keys: k}}
+  expect: {output: {items: 3, keys: k}}
+
+Default_Filter:
+  desc: 取值失败默认报错；需要兜底时显式写 default
+  config: {data: {age: "{{ user.age | default(0) }}"}}
+  upstream: {user: {}}
+  expect: {output: {age: 0}}
+
+Request_Namespace:
+  desc: 可以读取请求信息（headers 键为小写）
+  config: {data: {ua: "{{ request.headers['user-agent'] }}", trace: "{{ request.traceId }}"}}
+  request: {headers: {user-agent: curl/8}, traceId: t-1}
+  expect: {output: {ua: curl/8, trace: t-1}}
+
+Error_Missing_Field:
+  desc: 引用不存在的字段 → 500，提示可用 default 兜底
+  config: {data: "{{ total.nope }}"}
+  upstream: {total: {n: 1}}
+  expect:
+    error: {type: ExecError, msg: "use | default(...) as fallback"}
+
+Build_Not_Upstream:
+  desc: 只能引用上游节点（以及 inputs / request），写错名字启动即报错
+  upstream: {total: {n: 1}}
+  expect: {buildError: "unknown variable 'rows'"}
+
+Build_Syntax_Error:
+  desc: 模板语法错误启动即报错
+  config: {data: "{{ inputs.a + }}"}
+  inputs: {a: 1}
+  expect: {buildError: "template syntax error"}
+
+Build_Missing_Template:
+  desc: data 必填
+  config: {data: null}
+  expect: {buildError: "missing required field"}

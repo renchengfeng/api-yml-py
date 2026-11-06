@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "lowcode"
+version = "0.1.0"
+description = "YAML 驱动的 Flask 低代码 HTTP 框架（server / group / api / 算子 四层模型）"
+requires-python = ">=3.9"
+dependencies = ["Flask>=3.0,<4", "PyYAML>=6.0,<7"]
+
+[project.optional-dependencies]
+mysql = ["pymysql>=1.1"]
+redis = ["redis>=5.0"]
+
+[project.scripts]
+lowcode = "lowcode.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["lowcode*"]

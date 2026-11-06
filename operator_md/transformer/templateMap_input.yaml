@@ -1,0 +1,45 @@
+# templateMap 用例集
+Keys_From_Dates:
+  desc: 按日期列表拼出键名
+  upstream: {dates: ["20261103", "20261104"]}
+  expect:
+    output: ["counter|daily|a|20261103", "counter|daily|a|20261104"]
+
+Index_Available:
+  desc: index 是当前下标，可与 item 组合
+  config: {template: "{{ index }}:{{ item }}"}
+  upstream: {dates: [a, b, c]}
+  expect: {output: ["0:a", "1:b", "2:c"]}
+
+Number_Item:
+  desc: 元素是数字时按原生类型渲染
+  config: {template: "n={{ item }}"}
+  upstream: {dates: [1, 2]}
+  expect: {output: ["n=1", "n=2"]}
+
+Literal_Items:
+  desc: items 也可以直接写字面量列表
+  config: {items: [x, y], template: "k|{{ item }}"}
+  expect: {output: ["k|x", "k|y"]}
+
+Empty_List:
+  desc: 空列表返回空列表
+  upstream: {dates: []}
+  expect: {output: []}
+
+Error_Not_A_List:
+  desc: items 渲染后不是列表时显式报错
+  upstream: {dates: {a: 1}}
+  expect: {error: {type: ExecError, code: 500, msg: "items must render to a list"}}
+
+Error_Unknown_Field:
+  desc: 模板引用了元素里不存在的字段
+  config: {template: "{{ item.nope }}"}
+  upstream: {dates: [{a: 1}]}
+  expect: {error: {type: ExecError, msg: "template lookup failed"}}
+
+BuildError_Bad_Template:
+  desc: 模板语法错误在启动期就报错
+  config: {template: "{{ item"}
+  upstream: {dates: [a]}
+  expect: {buildError: "template syntax error"}

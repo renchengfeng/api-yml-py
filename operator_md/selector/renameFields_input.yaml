@@ -1,0 +1,55 @@
+# renameFields 用例集
+Rename_List:
+  desc: 对象列表逐行改名
+  upstream:
+    rows:
+      - {date: "20261103", sum: 13}
+      - {date: "20261104", sum: 143}
+  expect:
+    output:
+      - {date: "20261103", cnt: 13}
+      - {date: "20261104", cnt: 143}
+
+Single_Object:
+  desc: 单个对象同样支持
+  config: {data: "{{ row }}"}
+  upstream: {row: {date: "20261103", sum: 13}}
+  expect: {output: {date: "20261103", cnt: 13}}
+
+Keep_Other_Fields:
+  desc: 未列出的字段原样保留（含 null）
+  config: {mapping: {sum: cnt, count: total}}
+  upstream: {rows: [{date: "20261103", sum: 13, count: 2, note: null}]}
+  expect: {output: [{date: "20261103", cnt: 13, total: 2, note: null}]}
+
+Empty_List:
+  desc: 空列表返回空列表
+  upstream: {rows: []}
+  expect: {output: []}
+
+Error_Collision:
+  desc: 目标字段已存在时报错，不静默覆盖
+  upstream: {rows: [{sum: 13, cnt: 1}]}
+  expect: {error: {type: ExecError, msg: "already exists"}}
+
+Error_Not_Object:
+  desc: 行不是对象时报错
+  upstream: {rows: [1, 2]}
+  expect: {error: {type: ExecError, msg: "must be objects"}}
+
+Error_Not_Data:
+  desc: data 渲染成标量时报错
+  upstream: {rows: 5}
+  expect: {error: {type: ExecError, msg: "data must render to an object or a list"}}
+
+BuildError_Empty_Mapping:
+  desc: 空映射没有意义，启动期报错
+  config: {mapping: {}}
+  upstream: {rows: []}
+  expect: {buildError: "mapping must not be empty"}
+
+BuildError_Bad_Target:
+  desc: 目标名不是字符串时启动期报错
+  config: {mapping: {sum: 1}}
+  upstream: {rows: []}
+  expect: {buildError: "must map field names"}

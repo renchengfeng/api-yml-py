@@ -1,0 +1,7 @@
+# rowFilter 节点模板：按字段与阈值过滤对象列表
+name: "rowFilter"
+config:
+  data: "{{ rows }}"
+  field: sum
+  op: gt
+  value: 10

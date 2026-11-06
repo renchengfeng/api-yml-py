@@ -1,0 +1,8 @@
+# sqlQuery 节点模板：写法与接口文件 graph[] 中的一项完全相同，可直接复制使用。
+# 用例（sqlQuery_input.yaml）在此基础上按需覆盖 config。
+id: users
+name: "sqlQuery"
+config:
+  dataSource: main
+  sql: select id, name, level from users where level >= :level order by id
+  params: {level: "{{ inputs.level }}"}

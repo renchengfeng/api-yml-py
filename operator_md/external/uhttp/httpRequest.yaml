@@ -1,0 +1,7 @@
+# httpRequest 节点模板
+id: profile
+name: "httpRequest"
+config:
+  dataSource: up
+  url: "/users/{{ inputs.uid }}"
+  query: {fields: basic}

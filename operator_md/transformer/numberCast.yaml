@@ -1,0 +1,5 @@
+# numberCast 节点模板：把文本字段转成数值，供 groupBy / listAgg 等聚合算子使用
+name: "numberCast"
+config:
+  data: "{{ rows }}"
+  fields: [cnt]

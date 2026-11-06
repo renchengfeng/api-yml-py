@@ -1,0 +1,363 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2460 1338" width="100%" role="img" aria-label="算子调用关系图" font-family="-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif">
+<style>path.link{transition:stroke-width .1s}path.link:hover{stroke-width:3;stroke-opacity:1}g.nd:hover rect.box{stroke:#94a3b8}</style>
+<defs>
+<marker id="a-reg" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#db2777"/></marker>
+<marker id="a-compile" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#7c3aed"/></marker>
+<marker id="a-exec" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6.5" markerHeight="6.5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" fill="#059669"/></marker>
+</defs>
+<rect x="14" y="30" width="2432" height="148" rx="10" fill="#fdf2f8" stroke="#db2777" stroke-opacity="0.28"/>
+<text x="32" y="57" font-size="13" font-weight="700" fill="#db2777">阶段 0 · 注册期</text>
+<text x="174" y="57" font-size="11" fill="#64748b">import 时一次</text>
+<rect x="14" y="198" width="2432" height="664" rx="10" fill="#f5f3ff" stroke="#7c3aed" stroke-opacity="0.28"/>
+<text x="32" y="225" font-size="13" font-weight="700" fill="#7c3aed">阶段 1 · 编译期</text>
+<text x="174" y="225" font-size="11" fill="#64748b">每个接口一次</text>
+<rect x="14" y="882" width="2432" height="406" rx="10" fill="#ecfdf5" stroke="#059669" stroke-opacity="0.28"/>
+<text x="32" y="909" font-size="13" font-weight="700" fill="#059669">阶段 2 · 请求期</text>
+<text x="174" y="909" font-size="11" fill="#64748b">每个请求一次</text>
+<path class="link" d="M 296.0 106.0 H 321.0 V 106.0 H 346.0" fill="none" stroke="#db2777" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-reg)"><title>operators/__init__.py:模块导入 → external/uredis/__init__.py:from . import redisGet（触发模块体执行）</title></path>
+<path class="link" d="M 596.0 106.0 H 621.0 V 106.0 H 646.0" fill="none" stroke="#db2777" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-reg)"><title>external/uredis/__init__.py:from . import redisGet → external/uredis/redisGet.py:@register(&quot;redisGet&quot;)（装饰器作用于 RedisGet 类）</title></path>
+<path class="link" d="M 896.0 106.0 H 921.0 V 106.0 H 946.0" fill="none" stroke="#db2777" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-reg)"><title>external/uredis/redisGet.py:@register(&quot;redisGet&quot;) → operators/registry.py:register()（校验命名/spec/重名 → 写 _operators）</title></path>
+<path class="link" d="M 296.0 252.0 H 304.3 V 274.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → config/loader.py:load_config()（YAML → ServerDef）</title></path>
+<text x="300.2" y="246.0" font-size="10" fill="#7c3aed" text-anchor="middle">①</text>
+<path class="link" d="M 296.0 263.0 H 312.7 V 360.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → datasources/__init__.py:from_config()（实例化全部数据源）</title></path>
+<text x="304.3" y="257.0" font-size="10" fill="#7c3aed" text-anchor="middle">②</text>
+<path class="link" d="M 596.0 360.0 H 612.7 V 274.0 H 646.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>datasources/__init__.py:from_config() → datasources/__init__.py:create_datasource()（构造数据源 + check()）</title></path>
+<path class="link" d="M 296.0 274.0 H 321.0 V 446.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → core/builder.py:Builder.build()（逐 group / api 编译）</title></path>
+<text x="308.5" y="268.0" font-size="10" fill="#7c3aed" text-anchor="middle">③</text>
+<path class="link" d="M 596.0 446.0 H 629.3 V 360.0 H 646.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:Builder.build() → core/builder.py:build_api()（分层、定结果节点）</title></path>
+<path class="link" d="M 896.0 349.0 H 908.5 V 274.0 H 946.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:build_api() → core/inputs.py:InputSchema()（构造入参校验器）</title></path>
+<path class="link" d="M 896.0 360.0 H 921.0 V 360.0 H 946.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:build_api() → core/builder.py:compile_node()（编译单个节点）</title></path>
+<path class="link" d="M 896.0 371.0 H 933.5 V 446.0 H 946.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:build_api() → core/builder.py:_check_outputs()（outputs 对账）</title></path>
+<path class="link" d="M 1196.0 354.5 H 1212.7 V 274.0 H 1246.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:compile_node() → operators/registry.py:create_operator()（查表/防注入/校验/build）</title></path>
+<path class="link" d="M 1496.0 252.0 H 1502.2 V 274.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → operators/registry.py:get_operator()（查 _operators）</title></path>
+<path class="link" d="M 1496.0 263.0 H 1508.5 V 360.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → spec.py:is_template()（非 dynamic/raw 拒绝模板）</title></path>
+<path class="link" d="M 1496.0 274.0 H 1514.8 V 446.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → spec.py:validate()（按 spec 校验补默认）</title></path>
+<path class="link" d="M 1496.0 285.0 H 1521.0 V 532.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → external/uredis/redisGet.py:RedisGet()（实例化算子）</title></path>
+<path class="link" d="M 1496.0 296.0 H 1527.2 V 618.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>operators/registry.py:create_operator() → external/uredis/redisGet.py:RedisGet.build()（取数据源 + 校验配置）</title></path>
+<path class="link" d="M 1796.0 612.5 H 1808.5 V 274.0 H 1846.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>external/uredis/redisGet.py:RedisGet.build() → core/builder.py:BuildEnv.datasource()（解析 kv 数据源）</title></path>
+<path class="link" d="M 2096.0 268.5 H 2112.7 V 274.0 H 2146.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:BuildEnv.datasource() → datasources/__init__.py:resolve()（按 (name, kind) 匹配）</title></path>
+<path class="link" d="M 2096.0 279.5 H 2129.3 V 360.0 H 2146.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:BuildEnv.datasource() → datasources/redis.py:check_dependencies()（find_spec 探测依赖）</title></path>
+<path class="link" d="M 1796.0 623.5 H 1821.0 V 360.0 H 1846.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>external/uredis/redisGet.py:RedisGet.build() → external/uredis/parse.py:check_config()（校验 csv 配置）</title></path>
+<path class="link" d="M 1196.0 365.5 H 1229.3 V 360.0 H 1246.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:compile_node() → core/builder.py:_compile_config()（拆 static/dynamic/raw）</title></path>
+<path class="link" d="M 1496.0 354.5 H 1533.5 V 704.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:_compile_config() → core/template.py:compile_template()（值 → Template）</title></path>
+<path class="link" d="M 1796.0 704.0 H 1833.5 V 446.0 H 1846.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/template.py:compile_template() → core/template.py:_analyze()（提取引用名）</title></path>
+<path class="link" d="M 1496.0 365.5 H 1539.8 V 790.0 H 1546.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>core/builder.py:_compile_config() → core/builder.py:_check_refs()（只允许 inputs/上游）</title></path>
+<path class="link" d="M 296.0 285.0 H 329.3 V 532.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → errors.py:raise_if_any()（汇总后一次抛 ConfigError）</title></path>
+<text x="312.7" y="279.0" font-size="10" fill="#7c3aed" text-anchor="middle">④</text>
+<path class="link" d="M 296.0 296.0 H 337.7 V 618.0 H 346.0" fill="none" stroke="#7c3aed" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-compile)"><title>runtime.py:build_runtime() → core/executor.py:Executor()（建线程池）</title></path>
+<text x="316.8" y="290.0" font-size="10" fill="#7c3aed" text-anchor="middle">⑤</text>
+<path class="link" d="M 296.0 941.5 H 306.0 V 958.0 H 346.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>web/app.py:view() → core/inputs.py:InputSchema.parse()（校验入参 → inputs）</title></path>
+<path class="link" d="M 296.0 952.5 H 316.0 V 1044.0 H 346.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>web/app.py:view() → core/context.py:Context()（请求级黑板）</title></path>
+<path class="link" d="M 296.0 963.5 H 326.0 V 1130.0 H 346.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>web/app.py:view() → core/executor.py:Executor.run()（按 levels 逐层）</title></path>
+<path class="link" d="M 596.0 1130.0 H 621.0 V 958.0 H 646.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:Executor.run() → core/executor.py:run_node()（所有节点唯一入口）</title></path>
+<path class="link" d="M 896.0 941.5 H 906.0 V 958.0 H 946.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:run_node() → core/builder.py:resolve_args()（静态原样 + dynamic 渲染）</title></path>
+<path class="link" d="M 1196.0 952.5 H 1206.0 V 958.0 H 1246.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/builder.py:resolve_args() → core/context.py:Context.scope()（上游输出 + inputs + request）</title></path>
+<path class="link" d="M 1196.0 963.5 H 1216.0 V 1044.0 H 1246.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/builder.py:resolve_args() → core/template.py:Template.render()（Jinja 沙箱求值）</title></path>
+<path class="link" d="M 896.0 952.5 H 916.0 V 1044.0 H 946.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:run_node() → external/uredis/redisGet.py:RedisGet.execute()（读键 + 按 format 解析）</title></path>
+<path class="link" d="M 1196.0 1038.5 H 1226.0 V 1130.0 H 1246.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>external/uredis/redisGet.py:RedisGet.execute() → datasources/redis.py:RedisDataSource.get()（懒加载客户端取字符串）</title></path>
+<path class="link" d="M 1196.0 1049.5 H 1236.0 V 1216.0 H 1246.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>external/uredis/redisGet.py:RedisGet.execute() → external/uredis/parse.py:parse_value()（raw/json/csv 解析）</title></path>
+<path class="link" d="M 896.0 963.5 H 926.0 V 1130.0 H 946.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:run_node() → core/context.py:Context.set_output()（写黑板供下游引用）</title></path>
+<path class="link" d="M 896.0 974.5 H 936.0 V 1216.0 H 946.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>core/executor.py:run_node() → core/context.py:Context.record()（finally 记 trace）</title></path>
+<path class="link" d="M 296.0 974.5 H 336.0 V 1216.0 H 346.0" fill="none" stroke="#059669" stroke-width="1.4" stroke-opacity="0.6" marker-end="url(#a-exec)"><title>web/app.py:view() → web/response.py:envelope()（{code,msg,traceId,data}）</title></path>
+<g class="nd"><title>operators/__init__.py:模块导入 —— 末尾导入五个分类包</title>
+<rect class="box" x="46" y="74" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="46" y="74" width="4" height="64" rx="2" fill="#db2777"/>
+<text x="58" y="92" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">operators/__init__.py</text>
+<text x="58" y="111" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">模块导入</text>
+<text x="58" y="127" font-size="9" fill="#94a3b8">末尾导入五个分类包</text>
+</g>
+<g class="nd"><title>external/uredis/__init__.py:from . import redisGet —— 触发模块体执行</title>
+<rect class="box" x="346" y="74" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="74" width="4" height="64" rx="2" fill="#db2777"/>
+<text x="358" y="92" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/__init__.py</text>
+<text x="358" y="111" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">from . import redisGet</text>
+<text x="358" y="127" font-size="9" fill="#94a3b8">触发模块体执行</text>
+</g>
+<g class="nd"><title>external/uredis/redisGet.py:@register(&quot;redisGet&quot;) —— 装饰器作用于 RedisGet 类</title>
+<rect class="box" x="646" y="74" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="646" y="74" width="4" height="64" rx="2" fill="#db2777"/>
+<text x="658" y="92" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="658" y="111" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">@register(&quot;redisGet&quot;)</text>
+<text x="658" y="127" font-size="9" fill="#94a3b8">装饰器作用于 RedisGet 类</text>
+</g>
+<g class="nd"><title>operators/registry.py:register() —— 校验命名/spec/重名 → 写 _operators</title>
+<rect class="box" x="946" y="74" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="74" width="4" height="64" rx="2" fill="#db2777"/>
+<text x="958" y="92" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">operators/registry.py</text>
+<text x="958" y="111" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">register()</text>
+<text x="958" y="127" font-size="9" fill="#94a3b8">校验命名/spec/重名 → 写 _operators</text>
+</g>
+<g class="nd"><title>runtime.py:build_runtime() —— 唯一装配入口</title>
+<rect class="box" x="46" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="46" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="58" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">runtime.py</text>
+<text x="58" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">build_runtime()</text>
+<text x="58" y="295" font-size="9" fill="#94a3b8">唯一装配入口</text>
+</g>
+<g class="nd"><title>config/loader.py:load_config() —— YAML → ServerDef</title>
+<rect class="box" x="346" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">config/loader.py</text>
+<text x="358" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">load_config()</text>
+<text x="358" y="295" font-size="9" fill="#94a3b8">YAML → ServerDef</text>
+</g>
+<g class="nd"><title>datasources/__init__.py:from_config() —— 实例化全部数据源</title>
+<rect class="box" x="346" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/__init__.py</text>
+<text x="358" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">from_config()</text>
+<text x="358" y="381" font-size="9" fill="#94a3b8">实例化全部数据源</text>
+</g>
+<g class="nd"><title>datasources/__init__.py:create_datasource() —— 构造数据源 + check()</title>
+<rect class="box" x="646" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="646" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="658" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/__init__.py</text>
+<text x="658" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">create_datasource()</text>
+<text x="658" y="295" font-size="9" fill="#94a3b8">构造数据源 + check()</text>
+</g>
+<g class="nd"><title>core/builder.py:Builder.build() —— 逐 group / api 编译</title>
+<rect class="box" x="346" y="414" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="414" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="432" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="358" y="451" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Builder.build()</text>
+<text x="358" y="467" font-size="9" fill="#94a3b8">逐 group / api 编译</text>
+</g>
+<g class="nd"><title>core/builder.py:build_api() —— 分层、定结果节点</title>
+<rect class="box" x="646" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="646" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="658" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="658" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">build_api()</text>
+<text x="658" y="381" font-size="9" fill="#94a3b8">分层、定结果节点</text>
+</g>
+<g class="nd"><title>core/inputs.py:InputSchema() —— 构造入参校验器</title>
+<rect class="box" x="946" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="958" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/inputs.py</text>
+<text x="958" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">InputSchema()</text>
+<text x="958" y="295" font-size="9" fill="#94a3b8">构造入参校验器</text>
+</g>
+<g class="nd"><title>core/builder.py:compile_node() —— 编译单个节点</title>
+<rect class="box" x="946" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="958" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="958" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">compile_node()</text>
+<text x="958" y="381" font-size="9" fill="#94a3b8">编译单个节点</text>
+</g>
+<g class="nd"><title>operators/registry.py:create_operator() —— 查表/防注入/校验/build</title>
+<rect class="box" x="1246" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1258" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">operators/registry.py</text>
+<text x="1258" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">create_operator()</text>
+<text x="1258" y="295" font-size="9" fill="#94a3b8">查表/防注入/校验/build</text>
+</g>
+<g class="nd"><title>operators/registry.py:get_operator() —— 查 _operators</title>
+<rect class="box" x="1546" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">operators/registry.py</text>
+<text x="1558" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">get_operator()</text>
+<text x="1558" y="295" font-size="9" fill="#94a3b8">查 _operators</text>
+</g>
+<g class="nd"><title>spec.py:is_template() —— 非 dynamic/raw 拒绝模板</title>
+<rect class="box" x="1546" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">spec.py</text>
+<text x="1558" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">is_template()</text>
+<text x="1558" y="381" font-size="9" fill="#94a3b8">非 dynamic/raw 拒绝模板</text>
+</g>
+<g class="nd"><title>spec.py:validate() —— 按 spec 校验补默认</title>
+<rect class="box" x="1546" y="414" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="414" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="432" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">spec.py</text>
+<text x="1558" y="451" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">validate()</text>
+<text x="1558" y="467" font-size="9" fill="#94a3b8">按 spec 校验补默认</text>
+</g>
+<g class="nd"><title>external/uredis/redisGet.py:RedisGet() —— 实例化算子</title>
+<rect class="box" x="1546" y="500" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="500" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="518" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="1558" y="537" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">RedisGet()</text>
+<text x="1558" y="553" font-size="9" fill="#94a3b8">实例化算子</text>
+</g>
+<g class="nd"><title>external/uredis/redisGet.py:RedisGet.build() —— 取数据源 + 校验配置</title>
+<rect class="box" x="1546" y="586" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="586" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="604" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="1558" y="623" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">RedisGet.build()</text>
+<text x="1558" y="639" font-size="9" fill="#94a3b8">取数据源 + 校验配置</text>
+</g>
+<g class="nd"><title>core/builder.py:BuildEnv.datasource() —— 解析 kv 数据源</title>
+<rect class="box" x="1846" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1846" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1858" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="1858" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">BuildEnv.datasource()</text>
+<text x="1858" y="295" font-size="9" fill="#94a3b8">解析 kv 数据源</text>
+</g>
+<g class="nd"><title>datasources/__init__.py:resolve() —— 按 (name, kind) 匹配</title>
+<rect class="box" x="2146" y="242" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="2146" y="242" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="2158" y="260" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/__init__.py</text>
+<text x="2158" y="279" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">resolve()</text>
+<text x="2158" y="295" font-size="9" fill="#94a3b8">按 (name, kind) 匹配</text>
+</g>
+<g class="nd"><title>datasources/redis.py:check_dependencies() —— find_spec 探测依赖</title>
+<rect class="box" x="2146" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="2146" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="2158" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/redis.py</text>
+<text x="2158" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">check_dependencies()</text>
+<text x="2158" y="381" font-size="9" fill="#94a3b8">find_spec 探测依赖</text>
+</g>
+<g class="nd"><title>external/uredis/parse.py:check_config() —— 校验 csv 配置</title>
+<rect class="box" x="1846" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1846" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1858" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/parse.py</text>
+<text x="1858" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">check_config()</text>
+<text x="1858" y="381" font-size="9" fill="#94a3b8">校验 csv 配置</text>
+</g>
+<g class="nd"><title>core/builder.py:_compile_config() —— 拆 static/dynamic/raw</title>
+<rect class="box" x="1246" y="328" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="328" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1258" y="346" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="1258" y="365" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">_compile_config()</text>
+<text x="1258" y="381" font-size="9" fill="#94a3b8">拆 static/dynamic/raw</text>
+</g>
+<g class="nd"><title>core/template.py:compile_template() —— 值 → Template</title>
+<rect class="box" x="1546" y="672" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="672" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="690" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/template.py</text>
+<text x="1558" y="709" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">compile_template()</text>
+<text x="1558" y="725" font-size="9" fill="#94a3b8">值 → Template</text>
+</g>
+<g class="nd"><title>core/template.py:_analyze() —— 提取引用名</title>
+<rect class="box" x="1846" y="414" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1846" y="414" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1858" y="432" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/template.py</text>
+<text x="1858" y="451" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">_analyze()</text>
+<text x="1858" y="467" font-size="9" fill="#94a3b8">提取引用名</text>
+</g>
+<g class="nd"><title>core/builder.py:_check_refs() —— 只允许 inputs/上游</title>
+<rect class="box" x="1546" y="758" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1546" y="758" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="1558" y="776" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="1558" y="795" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">_check_refs()</text>
+<text x="1558" y="811" font-size="9" fill="#94a3b8">只允许 inputs/上游</text>
+</g>
+<g class="nd"><title>core/builder.py:_check_outputs() —— outputs 对账</title>
+<rect class="box" x="946" y="414" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="414" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="958" y="432" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="958" y="451" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">_check_outputs()</text>
+<text x="958" y="467" font-size="9" fill="#94a3b8">outputs 对账</text>
+</g>
+<g class="nd"><title>errors.py:raise_if_any() —— 汇总后一次抛 ConfigError</title>
+<rect class="box" x="346" y="500" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="500" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="518" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">errors.py</text>
+<text x="358" y="537" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">raise_if_any()</text>
+<text x="358" y="553" font-size="9" fill="#94a3b8">汇总后一次抛 ConfigError</text>
+</g>
+<g class="nd"><title>core/executor.py:Executor() —— 建线程池</title>
+<rect class="box" x="346" y="586" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="586" width="4" height="64" rx="2" fill="#7c3aed"/>
+<text x="358" y="604" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/executor.py</text>
+<text x="358" y="623" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Executor()</text>
+<text x="358" y="639" font-size="9" fill="#94a3b8">建线程池</text>
+</g>
+<g class="nd"><title>web/app.py:view() —— Flask 路由视图</title>
+<rect class="box" x="46" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="46" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="58" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">web/app.py</text>
+<text x="58" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">view()</text>
+<text x="58" y="979" font-size="9" fill="#94a3b8">Flask 路由视图</text>
+</g>
+<g class="nd"><title>core/inputs.py:InputSchema.parse() —— 校验入参 → inputs</title>
+<rect class="box" x="346" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="358" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/inputs.py</text>
+<text x="358" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">InputSchema.parse()</text>
+<text x="358" y="979" font-size="9" fill="#94a3b8">校验入参 → inputs</text>
+</g>
+<g class="nd"><title>core/context.py:Context() —— 请求级黑板</title>
+<rect class="box" x="346" y="1012" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="1012" width="4" height="64" rx="2" fill="#059669"/>
+<text x="358" y="1030" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="358" y="1049" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Context()</text>
+<text x="358" y="1065" font-size="9" fill="#94a3b8">请求级黑板</text>
+</g>
+<g class="nd"><title>core/executor.py:Executor.run() —— 按 levels 逐层</title>
+<rect class="box" x="346" y="1098" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="1098" width="4" height="64" rx="2" fill="#059669"/>
+<text x="358" y="1116" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/executor.py</text>
+<text x="358" y="1135" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Executor.run()</text>
+<text x="358" y="1151" font-size="9" fill="#94a3b8">按 levels 逐层</text>
+</g>
+<g class="nd"><title>core/executor.py:run_node() —— 所有节点唯一入口</title>
+<rect class="box" x="646" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="646" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="658" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/executor.py</text>
+<text x="658" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">run_node()</text>
+<text x="658" y="979" font-size="9" fill="#94a3b8">所有节点唯一入口</text>
+</g>
+<g class="nd"><title>core/builder.py:resolve_args() —— 静态原样 + dynamic 渲染</title>
+<rect class="box" x="946" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="958" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/builder.py</text>
+<text x="958" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">resolve_args()</text>
+<text x="958" y="979" font-size="9" fill="#94a3b8">静态原样 + dynamic 渲染</text>
+</g>
+<g class="nd"><title>core/context.py:Context.scope() —— 上游输出 + inputs + request</title>
+<rect class="box" x="1246" y="926" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="926" width="4" height="64" rx="2" fill="#059669"/>
+<text x="1258" y="944" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="1258" y="963" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Context.scope()</text>
+<text x="1258" y="979" font-size="9" fill="#94a3b8">上游输出 + inputs + request</text>
+</g>
+<g class="nd"><title>core/template.py:Template.render() —— Jinja 沙箱求值</title>
+<rect class="box" x="1246" y="1012" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="1012" width="4" height="64" rx="2" fill="#059669"/>
+<text x="1258" y="1030" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/template.py</text>
+<text x="1258" y="1049" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Template.render()</text>
+<text x="1258" y="1065" font-size="9" fill="#94a3b8">Jinja 沙箱求值</text>
+</g>
+<g class="nd"><title>external/uredis/redisGet.py:RedisGet.execute() —— 读键 + 按 format 解析</title>
+<rect class="box" x="946" y="1012" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="1012" width="4" height="64" rx="2" fill="#059669"/>
+<text x="958" y="1030" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/redisGet.py</text>
+<text x="958" y="1049" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">RedisGet.execute()</text>
+<text x="958" y="1065" font-size="9" fill="#94a3b8">读键 + 按 format 解析</text>
+</g>
+<g class="nd"><title>datasources/redis.py:RedisDataSource.get() —— 懒加载客户端取字符串</title>
+<rect class="box" x="1246" y="1098" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="1098" width="4" height="64" rx="2" fill="#059669"/>
+<text x="1258" y="1116" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">datasources/redis.py</text>
+<text x="1258" y="1135" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">RedisDataSource.get()</text>
+<text x="1258" y="1151" font-size="9" fill="#94a3b8">懒加载客户端取字符串</text>
+</g>
+<g class="nd"><title>external/uredis/parse.py:parse_value() —— raw/json/csv 解析</title>
+<rect class="box" x="1246" y="1184" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="1246" y="1184" width="4" height="64" rx="2" fill="#059669"/>
+<text x="1258" y="1202" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">external/uredis/parse.py</text>
+<text x="1258" y="1221" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">parse_value()</text>
+<text x="1258" y="1237" font-size="9" fill="#94a3b8">raw/json/csv 解析</text>
+</g>
+<g class="nd"><title>core/context.py:Context.set_output() —— 写黑板供下游引用</title>
+<rect class="box" x="946" y="1098" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="1098" width="4" height="64" rx="2" fill="#059669"/>
+<text x="958" y="1116" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="958" y="1135" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Context.set_output()</text>
+<text x="958" y="1151" font-size="9" fill="#94a3b8">写黑板供下游引用</text>
+</g>
+<g class="nd"><title>core/context.py:Context.record() —— finally 记 trace</title>
+<rect class="box" x="946" y="1184" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="946" y="1184" width="4" height="64" rx="2" fill="#059669"/>
+<text x="958" y="1202" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">core/context.py</text>
+<text x="958" y="1221" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">Context.record()</text>
+<text x="958" y="1237" font-size="9" fill="#94a3b8">finally 记 trace</text>
+</g>
+<g class="nd"><title>web/response.py:envelope() —— {code,msg,traceId,data}</title>
+<rect class="box" x="346" y="1184" width="250" height="64" rx="6" fill="#fff" stroke="#e2e8f0"/>
+<rect x="346" y="1184" width="4" height="64" rx="2" fill="#059669"/>
+<text x="358" y="1202" font-size="9.5" fill="#64748b" font-family="ui-monospace,Menlo,Consolas,monospace">web/response.py</text>
+<text x="358" y="1221" font-size="11.5" font-weight="700" fill="#0f172a" font-family="ui-monospace,Menlo,Consolas,monospace">envelope()</text>
+<text x="358" y="1237" font-size="9" fill="#94a3b8">{code,msg,traceId,data}</text>
+</g>
+</svg>

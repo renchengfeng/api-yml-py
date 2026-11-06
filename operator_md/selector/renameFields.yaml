@@ -1,0 +1,5 @@
+# renameFields 节点模板：把 groupBy 的 sum 列改名为 cnt
+name: "renameFields"
+config:
+  data: "{{ rows }}"
+  mapping: {sum: cnt}

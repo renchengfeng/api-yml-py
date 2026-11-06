@@ -1,0 +1,7 @@
+# sqlExec 节点模板
+id: insert
+name: "sqlExec"
+config:
+  dataSource: main
+  sql: insert into users(name, level) values (:name, :level)
+  params: {name: "{{ inputs.name }}", level: "{{ inputs.level }}"}

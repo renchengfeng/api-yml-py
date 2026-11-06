@@ -1,0 +1,6 @@
+# respBuilder 节点模板：通常是接口的最后一个节点，决定响应 data 的形状
+name: "respBuilder"
+config:
+  data:
+    total: "{{ total.n }}"
+    list: "{{ rows }}"

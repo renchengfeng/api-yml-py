@@ -1,0 +1,56 @@
+# fieldPicker 用例集。字段说明见 tests/operator_test/TESTING.md
+Success_Dict:
+  desc: 对单个对象投影，只保留声明的字段
+  config: {data: "{{ user }}"}
+  upstream: {user: {id: 1, name: a, phone: "13812345678", level: 3}}
+  expect:
+    output: {id: 1, name: a, level: 3}
+
+Success_List:
+  desc: 对对象列表逐行投影
+  upstream:
+    users: [{id: 1, name: a, phone: "13812345678"}, {id: 2, name: b, phone: "13900001111"}]
+  expect:
+    output: [{id: 1, name: a, level: null}, {id: 2, name: b, level: null}]
+
+Missing_Filled_Null:
+  desc: 缺失字段补 null，输出 schema 稳定
+  upstream:
+    users: [{id: 1, name: a}, {id: 2, level: 5}]
+  expect:
+    output: [{id: 1, name: a, level: null}, {id: 2, name: null, level: 5}]
+
+Empty_List:
+  desc: 空列表返回空列表
+  upstream: {users: []}
+  expect: {output: []}
+
+Null_Passthrough:
+  desc: data 为 null（如查询单行无结果）时原样透传
+  config: {data: "{{ user }}"}
+  upstream: {user: null}
+  expect: {output: null}
+
+Single_Row:
+  desc: "单行对象同样支持（配合 single: true 的查询）"
+  config: {data: "{{ user }}"}
+  upstream: {user: {id: 7, name: 张三, city: 北京}}
+  expect: {output: {id: 7, name: 张三, level: null}}
+
+Build_Fields_Empty:
+  desc: fields 不能为空
+  config: {fields: []}
+  upstream: {users: []}
+  expect: {buildError: "fields must be a non-empty list of strings"}
+
+Build_Fields_Type:
+  desc: fields 只能是字符串列表
+  config: {fields: [id, 1]}
+  upstream: {users: []}
+  expect: {buildError: "fields must be a non-empty list of strings"}
+
+Build_Missing_Fields:
+  desc: fields 必填
+  config: {fields: null}
+  upstream: {users: []}
+  expect: {buildError: "missing required field"}

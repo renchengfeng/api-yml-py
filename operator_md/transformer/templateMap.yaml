@@ -1,0 +1,5 @@
+# templateMap 节点模板：把日期列表拼成一批 Redis key
+name: "templateMap"
+config:
+  items: "{{ dates }}"
+  template: "counter|daily|a|{{ item }}"

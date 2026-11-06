@@ -1,0 +1,136 @@
+# sqlQuery 用例集。字段说明见 tests/operator_test/TESTING.md
+_db: &db
+  sqlite:
+    name: main
+    setup: |
+      create table users (id integer primary key, name text not null, level integer not null);
+      insert into users(name, level) values ('a', 1), ('b', 3), ('c', 5);
+
+# ---------------------------------------------------------------- 正常路径
+Success_Rows:
+  desc: 返回行列表，每行一个对象，列名即键
+  inputs: {level: 3}
+  mocks: *db
+  expect:
+    output: [{id: 2, name: b, level: 3}, {id: 3, name: c, level: 5}]
+
+Empty_Rows:
+  desc: 没有命中时返回空列表，不报错
+  inputs: {level: 9}
+  mocks: *db
+  expect: {output: []}
+
+Single_Row:
+  desc: single=true 只返回首行（对象）
+  config: {single: true}
+  inputs: {level: 3}
+  mocks: *db
+  expect: {output: {id: 2, name: b, level: 3}}
+
+Single_None:
+  desc: single=true 且无数据时返回 null
+  config: {single: true}
+  inputs: {level: 9}
+  mocks: *db
+  expect: {output: null}
+
+Params_Whole_Inputs:
+  desc: params 整体写成 "{{ inputs }}"，入参名与绑定名一致时免逐个映射
+  config: {params: "{{ inputs }}"}
+  inputs: {level: 5}
+  mocks: *db
+  expect: {output: [{id: 3, name: c, level: 5}]}
+
+Params_From_Upstream:
+  desc: 绑定参数可以取上游节点的输出
+  config:
+    sql: select name from users where id = :id
+    params: {id: "{{ user.id }}"}
+  upstream: {user: {id: 1}}
+  mocks: *db
+  expect: {output: [{name: a}]}
+
+DataSource_Auto:
+  desc: 不写 dataSource 时，自动选中唯一的 SQL 数据源
+  config: {dataSource: null}
+  inputs: {level: 5}
+  mocks:
+    sqlite:
+      name: other
+      setup: create table users (id integer, name text, level integer); insert into users values (9, 'z', 5);
+  expect: {output: [{id: 9, name: z, level: 5}]}
+
+Injection_Is_Plain_Value:
+  desc: 参数值按绑定传入，注入串只会被当作普通字符串
+  config:
+    sql: select count(*) as n from users where name = :name
+    params: {name: "{{ inputs.name }}"}
+    single: true
+  inputs: {name: "a' or '1'='1"}
+  mocks: *db
+  expect: {output: {n: 0}}
+
+Colon_In_Literal:
+  desc: 引号与注释里的 :x 不算绑定参数
+  config:
+    sql: "select ':x' as a, '10:30' as t -- :y\n from users where level >= :level"
+    single: true
+  inputs: {level: 1}
+  mocks: *db
+  expect: {output: {a: ":x", t: "10:30"}}
+
+# ---------------------------------------------------------------- 运行期错误
+Error_Sql_Runtime:
+  desc: 执行期数据库报错（如表不存在）→ 500，错误信息带节点 id 前缀
+  config: {sql: "select * from nope where level >= :level"}
+  inputs: {level: 1}
+  mocks: *db
+  expect:
+    error: {type: ExecError, status: 500, msg: "[users] OperationalError: no such table: nope"}
+
+# ---------------------------------------------------------------- 启动期错误
+Build_Template_In_Sql:
+  desc: sql 不是 dynamic 字段，写 {{ }} 启动即报错（从机制上杜绝拼接注入）
+  config: {sql: "select * from users where level >= {{ inputs.level }}"}
+  inputs: {level: 1}
+  mocks: *db
+  expect: {buildError: "field sql does not support {{ }} templates"}
+
+Build_Missing_Param:
+  desc: SQL 中的绑定参数必须在 params 中提供
+  config: {params: {}}
+  mocks: *db
+  expect: {buildError: "bind :level in SQL is not provided in params"}
+
+Build_Unused_Param:
+  desc: params 中的键必须在 SQL 中用到（防止写错名字而静默失效）
+  config: {params: {level: 1, lvl: 2}}
+  mocks: *db
+  expect: {buildError: "params.lvl is not used in the SQL"}
+
+Build_Write_Statement:
+  desc: sqlQuery 只接受 SELECT / WITH，写语句须改用 sqlExec
+  config: {sql: "delete from users where level >= :level"}
+  inputs: {level: 1}
+  mocks: *db
+  expect: {buildError: "use sqlExec instead"}
+
+Build_Unknown_DataSource:
+  desc: 数据源名写错时给出近似名提示
+  config: {dataSource: mian}
+  inputs: {level: 1}
+  mocks: *db
+  expect: {buildError: "datasource 'mian' not found, did you mean 'main'?"}
+
+Build_Undeclared_Input:
+  desc: 模板引用了接口未声明的入参
+  config: {params: {level: "{{ inputs.lv }}"}}
+  inputs: {level: 1}
+  mocks: *db
+  expect: {buildError: "reference to undeclared input inputs.lv"}
+
+Build_Bad_Params_Type:
+  desc: params 只能是对象，或整体写成一个模板
+  config: {params: abc}
+  mocks: *db
+  expect: {buildError: "params must be an object"}

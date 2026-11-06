@@ -1,0 +1,6 @@
+# expectGuard 节点模板：条件不满足时中止接口（典型用法：查不到数据返回 404）
+name: "expectGuard"
+config:
+  expect: "{{ user }}"
+  code: 404
+  msg: "用户 {{ inputs.uid }} 不存在"

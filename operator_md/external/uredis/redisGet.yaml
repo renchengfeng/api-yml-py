@@ -1,0 +1,8 @@
+# redisGet 节点模板（对应 datamore_lite 的 stringRedisReader / jsonRedisReader / csvRedisReader）
+id: rank
+name: "redisGet"
+config:
+  dataSource: cache
+  key: "rt|rank|{{ inputs.env }}|{{ inputs.groupid }}"
+  format: json
+  default: []

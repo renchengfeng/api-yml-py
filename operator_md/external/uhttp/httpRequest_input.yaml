@@ -1,0 +1,121 @@
+# httpRequest 用例集。http Mock 是本地真实 HTTP 服务，测到的是"算子 + HTTP 数据源"完整路径
+_up: &up
+  http:
+    name: up
+    timeout: 1
+    headers: {X-Token: t1}
+    routes:
+      GET /users/7: {json: {id: 7, name: 张三}}
+      GET /text: {text: plain}
+      GET /echo: {echo: true}
+      POST /echo: {echo: true}
+      GET /fail: {status: 500, text: boom}
+      GET /slow: {delay: 1, json: {}}
+
+Success_Json:
+  desc: JSON 响应自动解析为对象
+  inputs: {uid: 7}
+  mocks: *up
+  expect: {output: {id: 7, name: 张三}}
+
+Text_Response:
+  desc: 非 JSON 响应原样返回文本
+  config: {url: /text}
+  mocks: *up
+  expect: {output: plain}
+
+Query_And_Headers:
+  desc: query 中值为 null 的项不发送；请求头 = 数据源公共头 + 节点 headers（值支持模板）
+  config:
+    url: /echo
+    query: {a: 1, b: null, q: "{{ inputs.q }}"}
+    headers: {X-Trace: "{{ request.traceId }}"}
+  inputs: {q: 中文}
+  request: {traceId: abc123}
+  mocks: *up
+  expect:
+    output:
+      method: GET
+      path: /echo
+      query: {a: "1", q: 中文}
+      headers: {x-token: t1, x-trace: abc123}
+      contentType: null
+      json: null
+
+Post_Json:
+  desc: "json 作为请求体发送，自动带 Content-Type: application/json；模板保留原生类型"
+  config:
+    url: /echo
+    method: POST
+    query: {}
+    json: {ids: [1, "{{ inputs.uid }}"]}
+  inputs: {uid: 7}
+  mocks: *up
+  expect:
+    output:
+      method: POST
+      path: /echo
+      query: {}
+      headers: {x-token: t1}
+      contentType: application/json
+      json: {ids: [1, 7]}
+
+Error_Upstream_5xx:
+  desc: 上游非 2xx → 502，信息带状态码与响应片段
+  config: {url: /fail}
+  mocks: *up
+  expect:
+    error: {type: UpstreamError, code: 502, msg: "[profile] upstream returned HTTP 500"}
+
+Error_Route_Not_Found:
+  desc: 上游 404 同样视为上游错误（502）
+  config: {url: /nope}
+  mocks: *up
+  expect:
+    error: {code: 502, msg: "HTTP 404"}
+
+Error_Timeout:
+  desc: 超过数据源超时 → 504
+  config: {url: /slow}
+  mocks:
+    http:
+      name: up
+      timeout: 0.2
+      routes: {GET /slow: {delay: 1, json: {}}}
+  expect:
+    error: {type: DeadlineError, code: 504}
+
+Error_Timeout_Remaining:
+  desc: 节点 timeout 再大，也不会超过接口剩余时间
+  config: {url: /slow, timeout: 10}
+  timeout: 0.2
+  mocks: *up
+  expect:
+    error: {type: DeadlineError, code: 504}
+
+Error_Unreachable_Absolute_Url:
+  desc: url 为绝对地址时可以不配数据源；地址不可达 → 502
+  config: {dataSource: null, url: "http://127.0.0.1:1/x", query: {}}
+  expect:
+    error: {type: UpstreamError, msg: "upstream unreachable"}
+
+Build_No_DataSource:
+  desc: 相对地址必须有 HTTP 数据源（提供 baseUrl）
+  config: {dataSource: null}
+  inputs: {uid: 7}
+  expect: {buildError: "cannot auto-select a http datasource"}
+
+Build_Wrong_Kind:
+  desc: 数据源类别必须是 http
+  config: {dataSource: main}
+  inputs: {uid: 7}
+  mocks:
+    sqlite: {name: main, setup: "create table t(a);"}
+  expect: {buildError: "but http is required"}
+
+Build_Bad_Method:
+  desc: method 只能是 GET / POST / PUT / DELETE / PATCH
+  config: {method: GETT}
+  inputs: {uid: 7}
+  mocks: *up
+  expect: {buildError: "did you mean 'GET'?"}

@@ -1,0 +1,5 @@
+Flask>=3.0,<4
+PyYAML>=6.0,<7
+# 可选：按需安装（只有在 server.yaml 中用到对应数据源时才需要）
+# pymysql>=1.1     # type: mysql
+# redis>=5.0       # type: redis

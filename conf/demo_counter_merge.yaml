@@ -1,0 +1,63 @@
+# GET /api/demo/counter/merge?date=20261103&cnt=10
+# Redis key  协议：counter|daily|{a|b}|{date}
+# Redis value 协议：{date}|{cnt}
+#
+# 单日期版本（保留，外部仍在调用）：读取两个 key，合并计数后只返回加和大于入参 cnt 的分组
+#   date=20261103&cnt=0   → [{date: "20261103", sum: 13}]
+#   date=20261103&cnt=13  → []（gt 是严格大于）
+#
+# 日期区间版本见 demo_counter_range.yaml（/api/demo/counter/range?sday=&eday=&cnt=）
+name: "Redis 双键按日期合并计数"
+method: GET
+path: "/demo/counter/merge"
+desc: "按日期读取两个 Redis key，合并计数后只返回加和大于入参 cnt 的分组"
+inputs:
+  - {name: "date", type: "string", required: true, desc: "统计日期，直接拼进 Redis key（须与 key 里的日期格式一致，如 20261103）"}
+  - {name: "cnt", type: "int", required: true, min: 0, desc: "只返回加和大于该值的分组"}
+outputs: []
+
+graph:
+  - id: a
+    name: "redisGet"
+    desc: "读 a 键的日期计数"
+    depends: []
+    config:
+      dataSource: "redis1"
+      key: "counter|daily|a|{{ inputs.date }}"
+      format: csv
+      fields: [date, cnt]
+      default: {date: "", cnt: "0"}
+
+  - id: b
+    name: "redisGet"
+    desc: "读 b 键的日期计数"
+    depends: []
+    config:
+      dataSource: "redis1"
+      key: "counter|daily|b|{{ inputs.date }}"
+      format: csv
+      fields: [date, cnt]
+      default: {date: "", cnt: "0"}
+
+  - id: cast
+    name: "numberCast"
+    desc: "把两行的 cnt 转成数值"
+    depends: [a, b]
+    config: {data: "{{ [a, b] }}", fields: [cnt]}
+
+  - id: grouped
+    name: "groupBy"
+    desc: "按 date 分组，cnt 求和"
+    depends: [cast]
+    config: {data: "{{ cast }}", by: date, field: cnt, ops: [sum]}
+
+  - id: filtered
+    name: "rowFilter"
+    desc: "只保留加和大于入参 cnt 的分组"
+    depends: [grouped]
+    config: {data: "{{ grouped }}", field: sum, op: gt, value: "{{ inputs.cnt }}"}
+
+  - name: "respBuilder"
+    depends: [filtered]
+    desc: "输出过滤后的计数"
+    config: {data: "{{ filtered }}"}

@@ -1,0 +1,100 @@
+# redisMGet 用例集
+_cache: &cache
+  redis:
+    name: cache
+    store:
+      "counter|daily|a|20261103": "20261103|6"
+      "counter|daily|b|20261103": "20261103|7"
+      "counter|daily|a|20261104": "20261104|66"
+      "rt|json": '[{"uid": "u1", "score": 90}]'
+      "rt|raw": "1|5|oXyz|1001"
+      "rt|rows": "u1,90;u2,80;"
+      "rt|bad": "{"
+
+Csv_Two_Keys:
+  desc: 多个键按键顺序解析成多行
+  inputs: {keys: ["counter|daily|a|20261103", "counter|daily|b|20261103"]}
+  mocks: *cache
+  expect:
+    output:
+      - {date: "20261103", cnt: "6"}
+      - {date: "20261103", cnt: "7"}
+
+Skip_Missing:
+  desc: 不存在的键默认跳过，不产生 null 行
+  inputs: {keys: ["counter|daily|a|20261103", "counter|daily|a|20261109"]}
+  mocks: *cache
+  expect: {output: [{date: "20261103", cnt: "6"}]}
+
+Keep_Missing_Default:
+  desc: skipMissing=false 时用 default 占位，保持与 keys 等长
+  config: {skipMissing: false, default: {date: "", cnt: "0"}}
+  inputs: {keys: ["counter|daily|a|20261109"]}
+  mocks: *cache
+  expect: {output: [{date: "", cnt: "0"}]}
+
+Raw_Values:
+  desc: format=raw 原样返回字符串
+  config: {format: raw}
+  inputs: {keys: ["rt|raw"]}
+  mocks: *cache
+  expect: {output: ["1|5|oXyz|1001"]}
+
+Json_Values:
+  desc: format=json 解析成对象；值是 JSON 数组时展开成多行
+  config: {format: json, fields: []}
+  inputs: {keys: ["rt|json"]}
+  mocks: *cache
+  expect: {output: [{uid: u1, score: 90}]}
+
+Row_Delimiter_Flatten:
+  desc: 一个键里的多行会被展开成多行
+  config: {format: csv, delimiter: ",", rowDelimiter: ";", fields: [uid, score]}
+  inputs: {keys: ["rt|rows"]}
+  mocks: *cache
+  expect:
+    output:
+      - {uid: u1, score: "90"}
+      - {uid: u2, score: "80"}
+
+Concat_Keys:
+  desc: keys 支持列表拼接（两个 templateMap 的结果合并）
+  config: {keys: "{{ a + b }}"}
+  upstream: {a: ["counter|daily|a|20261103"], b: ["counter|daily|b|20261103"]}
+  mocks: *cache
+  expect:
+    output:
+      - {date: "20261103", cnt: "6"}
+      - {date: "20261103", cnt: "7"}
+
+Empty_Keys:
+  desc: 空键列表不访问 Redis，直接返回空列表
+  inputs: {keys: []}
+  mocks: *cache
+  expect: {output: []}
+
+Error_Keys_Not_List:
+  desc: keys 渲染后不是列表时报错
+  inputs: {keys: "counter|daily|a|20261103"}
+  mocks: *cache
+  expect: {error: {type: ExecError, msg: "keys must render to a list"}}
+
+Error_Key_Not_String:
+  desc: 键必须是字符串
+  inputs: {keys: [1]}
+  mocks: *cache
+  expect: {error: {type: ExecError, msg: "keys must be a list of strings"}}
+
+Error_Bad_Json:
+  desc: JSON 值不合法时报错并指出键名
+  config: {format: json, fields: []}
+  inputs: {keys: ["rt|bad"]}
+  mocks: *cache
+  expect: {error: {type: ExecError, msg: "is not valid JSON"}}
+
+BuildError_Csv_No_Fields:
+  desc: format=csv 却没写 fields，启动期报错
+  config: {fields: []}
+  inputs: {keys: []}
+  mocks: *cache
+  expect: {buildError: "fields must be a non-empty list"}

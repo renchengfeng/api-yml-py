@@ -1,0 +1,63 @@
+# numberCast 用例集
+Int_And_Float:
+  desc: 字符串列转成 int / float，其它字段原样保留
+  upstream:
+    rows:
+      - {date: "2026-11-04", cnt: "10", note: a}
+      - {date: "2026-11-05", cnt: "2.5", note: b}
+  expect:
+    output:
+      - {date: "2026-11-04", cnt: 10, note: a}
+      - {date: "2026-11-05", cnt: 2.5, note: b}
+
+Single_Object:
+  desc: 单个对象同样支持
+  config: {data: "{{ row }}"}
+  upstream: {row: {date: "2026-11-04", cnt: "7"}}
+  expect: {output: {date: "2026-11-04", cnt: 7}}
+
+Already_Number_And_Bool:
+  desc: 已是数值或 bool 的值保持不变
+  upstream:
+    rows: [{cnt: 3}, {cnt: 1.5}, {cnt: true}]
+  expect: {output: [{cnt: 3}, {cnt: 1.5}, {cnt: true}]}
+
+Null_And_Missing:
+  desc: 字段为 null 或缺失时原样保留，不凭空补 0
+  upstream:
+    rows: [{cnt: null, date: "2026-11-04"}, {date: "2026-11-05"}]
+  expect:
+    output: [{cnt: null, date: "2026-11-04"}, {date: "2026-11-05"}]
+
+Empty_List:
+  desc: 空列表返回空列表
+  upstream: {rows: []}
+  expect: {output: []}
+
+Error_Bad_Number:
+  desc: 非数字字符串显式报错，不静默丢数
+  upstream: {rows: [{cnt: "abc"}]}
+  expect:
+    error: {type: ExecError, msg: "is not a number"}
+
+Error_Non_Object_Row:
+  desc: 行不是对象时报错
+  upstream: {rows: [1]}
+  expect:
+    error: {type: ExecError, msg: "rows to cast must be objects"}
+
+Error_Bad_Data_Type:
+  desc: data 渲染成其它类型时报错
+  upstream: {rows: "oops"}
+  expect:
+    error: {type: ExecError, msg: "data must render to an object or a list"}
+
+Build_Fields_Empty:
+  desc: fields 为空时启动期报错
+  config: {fields: []}
+  expect: {buildError: "fields must be a non-empty list of strings"}
+
+Build_Fields_Not_Strings:
+  desc: fields 含非字符串时启动期报错
+  config: {fields: [1]}
+  expect: {buildError: "fields must be a non-empty list of strings"}

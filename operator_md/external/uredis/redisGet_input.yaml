@@ -1,0 +1,126 @@
+# redisGet 用例集（格式取自 datamore_lite readme/redis_value_format_report.md 中的常见形态）
+_cache: &cache
+  redis:
+    name: cache
+    store:
+      "rt|rank|1|G001": '[{"uid": "u1", "score": 90}, {"uid": "u2", "score": 80}]'
+      "rt|pipe|u1": "1|5|oXyz|1001"
+      "user|profile|u100": "Alice,30,Beijing"
+      "user|profile|u200": "Bob,25"
+      "rt|rows|G1": "u1,90,A;u2,80,B;"
+      "rt|bad": "{"
+      "rt|hash|u1": {challenge_001: '{"win": "5"}', challenge_002: '{"win": "2"}'}
+      "rt|hcsv|u1": {d20250101: "3|1", d20250102: "5"}
+
+# ---------------------------------------------------------------- format: json
+Json_Array:
+  desc: JSON 值按 format=json 解析（排行榜数组）
+  inputs: {env: "1", groupid: G001}
+  mocks: *cache
+  expect:
+    output: [{uid: u1, score: 90}, {uid: u2, score: 80}]
+
+Missing_Key_Default:
+  desc: 键不存在时返回 default，DAG 继续执行（空数据兜底不报错）
+  inputs: {env: "9", groupid: NONE}
+  mocks: *cache
+  expect: {output: []}
+
+Missing_Key_Null:
+  desc: 没写 default 时键不存在返回 null
+  config: {default: null}
+  inputs: {env: "9", groupid: NONE}
+  mocks: *cache
+  expect: {output: null}
+
+Key_From_Upstream:
+  desc: key 模板可以引用上游节点输出
+  config: {key: "rt|rank|{{ group.env }}|{{ group.id }}"}
+  upstream: {group: {env: "1", id: G001}}
+  mocks: *cache
+  expect:
+    output: [{uid: u1, score: 90}, {uid: u2, score: 80}]
+
+# ---------------------------------------------------------------- format: raw
+Raw_String:
+  desc: format=raw 原样返回字符串，解析交给下游
+  config: {key: "rt|pipe|{{ inputs.uid }}", format: raw}
+  inputs: {uid: u1}
+  mocks: *cache
+  expect: {output: "1|5|oXyz|1001"}
+
+# ---------------------------------------------------------------- format: csv
+Csv_Single_Row:
+  desc: 只配 delimiter 时按单行解析为对象，列名来自 fields
+  config: {key: "user|profile|{{ inputs.uid }}", format: csv, delimiter: ",", fields: [name, age, city]}
+  inputs: {uid: u100}
+  mocks: *cache
+  expect: {output: {name: Alice, age: "30", city: Beijing}}
+
+Csv_Short_Row:
+  desc: 列数不足时按 fields 对齐，缺失列补空串
+  config: {key: "user|profile|{{ inputs.uid }}", format: csv, delimiter: ",", fields: [name, age, city]}
+  inputs: {uid: u200}
+  mocks: *cache
+  expect: {output: {name: Bob, age: "25", city: ""}}
+
+Csv_Multi_Rows:
+  desc: 配了 rowDelimiter 时解析为对象列表，末尾空行自动跳过
+  config: {key: "rt|rows|{{ inputs.gid }}", format: csv, rowDelimiter: ";", delimiter: ",", fields: [uid, score, tag]}
+  inputs: {gid: G1}
+  mocks: *cache
+  expect:
+    output: [{uid: u1, score: "90", tag: A}, {uid: u2, score: "80", tag: B}]
+
+# ---------------------------------------------------------------- command: hgetall
+Hash_Json:
+  desc: hgetall 返回对象，format 作用于每个 field 的值
+  config: {key: "rt|hash|{{ inputs.uid }}", command: hgetall}
+  inputs: {uid: u1}
+  mocks: *cache
+  expect:
+    output: {challenge_001: {win: "5"}, challenge_002: {win: "2"}}
+
+Hash_Csv:
+  desc: hgetall + csv：每个 field 的值按 fields 切分
+  config: {key: "rt|hcsv|{{ inputs.uid }}", command: hgetall, format: csv, fields: [cnt, win]}
+  inputs: {uid: u1}
+  mocks: *cache
+  expect:
+    output: {d20250101: {cnt: "3", win: "1"}, d20250102: {cnt: "5", win: ""}}
+
+Hash_Missing_Default:
+  desc: hash 不存在（或为空）时返回 default
+  config: {key: "rt|hash|{{ inputs.uid }}", command: hgetall, default: {}}
+  inputs: {uid: nobody}
+  mocks: *cache
+  expect: {output: {}}
+
+# ---------------------------------------------------------------- 错误
+Error_Bad_Json:
+  desc: 值不是合法 JSON → 500，信息带键名
+  config: {key: "rt|bad"}
+  mocks: *cache
+  expect:
+    error: {type: ExecError, msg: "value of key rt|bad is not valid JSON"}
+
+Build_Csv_Without_Fields:
+  desc: format=csv 必须声明 fields（列名）
+  config: {format: csv}
+  inputs: {env: "1", groupid: G001}
+  mocks: *cache
+  expect: {buildError: "fields must be a non-empty list of strings when format=csv"}
+
+Build_Same_Delimiter:
+  desc: 行分隔符与列分隔符不能相同
+  config: {format: csv, fields: [a], delimiter: ";", rowDelimiter: ";"}
+  inputs: {env: "1", groupid: G001}
+  mocks: *cache
+  expect: {buildError: "equal to rowDelimiter"}
+
+Build_Bad_Command:
+  desc: command 只能是 get / hgetall
+  config: {command: hget}
+  inputs: {env: "1", groupid: G001}
+  mocks: *cache
+  expect: {buildError: "invalid value 'hget'"}

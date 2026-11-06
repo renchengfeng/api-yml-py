@@ -1,0 +1,6 @@
+# listAgg 节点模板：对对象列表的数值字段做整体统计
+name: "listAgg"
+config:
+  data: "{{ orders }}"
+  field: amount
+  ops: [count, sum, avg, min, max]

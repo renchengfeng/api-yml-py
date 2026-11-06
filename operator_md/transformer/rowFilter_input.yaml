@@ -1,0 +1,69 @@
+# rowFilter 用例集
+Greater_Than:
+  desc: 只保留 sum 严格大于阈值的行
+  upstream:
+    rows: [{date: d1, sum: 15}, {date: d2, sum: 10}, {date: d3, sum: 3}]
+  expect: {output: [{date: d1, sum: 15}]}
+
+Gte:
+  desc: gte 包含等于阈值的行
+  config: {op: gte}
+  upstream:
+    rows: [{sum: 15}, {sum: 10}, {sum: 3}]
+  expect: {output: [{sum: 15}, {sum: 10}]}
+
+Lt:
+  desc: lt 保留小于阈值的行
+  config: {op: lt}
+  upstream:
+    rows: [{sum: 15}, {sum: 3}]
+  expect: {output: [{sum: 3}]}
+
+Ne:
+  desc: ne 保留不等于阈值的行
+  config: {op: ne}
+  upstream:
+    rows: [{sum: 15}, {sum: 10}]
+  expect: {output: [{sum: 15}]}
+
+Empty_List:
+  desc: 空列表返回空列表
+  upstream: {rows: []}
+  expect: {output: []}
+
+Missing_Field_Skipped:
+  desc: 缺失比较字段的行不保留
+  upstream:
+    rows: [{sum: 15}, {date: d2}, {sum: null}]
+  expect: {output: [{sum: 15}]}
+
+Template_Value:
+  desc: 阈值支持模板，可引用入参
+  config: {value: "{{ inputs.cnt }}"}
+  inputs: {cnt: 12}
+  upstream:
+    rows: [{sum: 15}, {sum: 10}]
+  expect: {output: [{sum: 15}]}
+
+Error_Bad_Data:
+  desc: data 不是列表时报错
+  upstream: {rows: "oops"}
+  expect:
+    error: {type: ExecError, msg: "data must render to a list"}
+
+Error_Non_Object_Row:
+  desc: 行不是对象时报错
+  upstream: {rows: [1]}
+  expect:
+    error: {type: ExecError, msg: "rows to filter must be objects"}
+
+Error_Type_Mismatch:
+  desc: 字符串与数值比较时显式报错
+  upstream: {rows: [{sum: "15"}]}
+  expect:
+    error: {type: ExecError, msg: "cannot compare field sum"}
+
+Build_Bad_Op:
+  desc: 非法比较运算符在启动期被拒绝
+  config: {op: like}
+  expect: {buildError: "invalid value"}

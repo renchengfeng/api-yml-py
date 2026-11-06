@@ -1,0 +1,8 @@
+# redisMGet 节点模板：按键列表批量读取并解析
+name: "redisMGet"
+config:
+  dataSource: cache
+  keys: "{{ inputs.keys }}"
+  format: csv
+  fields: [date, cnt]
+  skipMissing: true

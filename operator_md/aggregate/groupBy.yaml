@@ -1,0 +1,7 @@
+# groupBy 节点模板：按字段分组统计
+name: "groupBy"
+config:
+  data: "{{ orders }}"
+  by: status
+  field: amount
+  ops: [count, sum]

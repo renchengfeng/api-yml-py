@@ -1,0 +1,59 @@
+# expectGuard 用例集
+Pass:
+  desc: 条件为真时放行，输出 true
+  inputs: {uid: 7}
+  upstream: {user: {id: 7}}
+  expect: {output: true}
+
+Fail_Not_Found:
+  desc: 条件为假时中止；code 在 400~599 时同时作为 HTTP 状态码；msg 不加节点前缀（给调用方看）
+  inputs: {uid: 7}
+  upstream: {user: null}
+  expect:
+    error: {type: BizError, code: 404, status: 404, msg: 用户 7 不存在}
+
+Fail_Empty_List:
+  desc: 空列表 / 空对象 / 0 / 空串都视为假
+  config: {expect: "{{ rows }}"}
+  inputs: {uid: 7}
+  upstream: {rows: []}
+  expect:
+    error: {code: 404}
+
+Expression:
+  desc: expect 可以是任意表达式
+  config: {expect: "{{ inputs.amount <= wallet.balance }}", code: 400, msg: 余额不足}
+  inputs: {uid: 7, amount: 50}
+  upstream: {wallet: {balance: 30}}
+  expect:
+    error: {code: 400, status: 400, msg: 余额不足}
+
+Biz_Code_Style:
+  desc: code 不在 400~599 时 HTTP 返回 200，调用方看响应体 code（业务码风格）
+  config: {code: 1001}
+  inputs: {uid: 7}
+  upstream: {user: null}
+  expect:
+    error: {code: 1001, status: 200}
+
+Default_Msg:
+  desc: 不写 msg 时使用默认提示
+  config: {msg: null}
+  inputs: {uid: 7}
+  upstream: {user: null}
+  expect:
+    error: {msg: 校验未通过}
+
+Build_Code_Zero:
+  desc: code 不能为 0（0 表示成功）
+  config: {code: 0}
+  inputs: {uid: 7}
+  upstream: {user: null}
+  expect: {buildError: "code must not be 0"}
+
+Build_Code_Template:
+  desc: code 不是 dynamic 字段，不能写模板（错误码应在配置期确定）
+  config: {code: "{{ inputs.uid }}"}
+  inputs: {uid: 7}
+  upstream: {user: null}
+  expect: {buildError: "field code does not support {{ }} templates"}

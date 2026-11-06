@@ -1,0 +1,55 @@
+# groupBy 用例集。字段说明见 tests/operator_test/TESTING.md
+Group_Count:
+  desc: 按字段分组计数，按 key 升序输出
+  config: {ops: [count]}
+  upstream:
+    orders: [{status: refunded}, {status: paid}, {status: paid}]
+  expect:
+    output: [{status: paid, count: 2}, {status: refunded, count: 1}]
+
+Group_With_Sum:
+  desc: 组内数值聚合；缺失数值的行计入 count、跳过 sum
+  upstream:
+    orders: [{status: paid, amount: 100}, {status: paid, amount: 50}, {status: paid}]
+  expect:
+    output: [{status: paid, count: 3, sum: 150}]
+
+Group_Mixed_Ops:
+  desc: 组内 avg / min / max
+  config: {ops: [count, avg, min, max]}
+  upstream:
+    orders: [{status: paid, amount: 10}, {status: paid, amount: 30}]
+  expect:
+    output: [{status: paid, count: 2, avg: 20, min: 10, max: 30}]
+
+Null_Group:
+  desc: 缺失分组字段的行归入 null 组，排最前
+  config: {ops: [count]}
+  upstream:
+    orders: [{status: paid}, {amount: 1}, {status: pending}]
+  expect:
+    output: [{status: null, count: 1}, {status: paid, count: 1}, {status: pending, count: 1}]
+
+Empty_List:
+  desc: 空列表返回空列表
+  upstream: {orders: []}
+  expect: {output: []}
+
+Error_Not_List:
+  desc: data 渲染结果不是列表 → 500
+  config: {data: "{{ row }}"}
+  upstream: {row: {status: paid}}
+  expect:
+    error: {type: ExecError, msg: "[groupBy] data must render to a list, got dict"}
+
+Build_Unknown_Op:
+  desc: 统计项写错时给出可选值
+  config: {ops: [cnt]}
+  upstream: {orders: []}
+  expect: {buildError: "unknown stats op 'cnt' (available: count, sum, avg, min, max)"}
+
+Build_Missing_Field:
+  desc: ops 含 count 之外的统计项时 field 必填
+  config: {ops: [sum], field: null}
+  upstream: {orders: []}
+  expect: {buildError: "field is required when ops includes anything other than count"}

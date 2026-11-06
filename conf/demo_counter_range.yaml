@@ -1,0 +1,82 @@
+# GET /api/demo/counter/range?sday=20261103&eday=20261104&cnt=10
+# Redis key  协议：counter|daily|{a|b}|{YYYYMMDD}
+# Redis value 协议：{YYYYMMDD}|{cnt}
+#
+# 例：
+#   set "counter|daily|a|20261103" "20261103|6"      set "counter|daily|b|20261103" "20261103|7"
+#   set "counter|daily|a|20261104" "20261104|66"     set "counter|daily|b|20261104" "20261104|77"
+#
+# 入参 cnt 是过滤阈值（不是计数）：只返回 a + b 合并计数 **大于** 它的日期。
+# 响应 data 是按日期升序的列表（键不存在的那天直接不出现）：
+#   cnt=10  → [{date: "20261103", cnt: 13}, {date: "20261104", cnt: 143}]
+#   cnt=100 → [{date: "20261104", cnt: 143}]
+#   cnt=200 → []
+#
+# 单日期的老接口见 demo_counter_merge.yaml（/api/demo/counter/merge?date=&cnt=）
+name: "Redis 双键按日期区间合并计数"
+method: GET
+path: "/demo/counter/range"
+desc: "读取 [sday, eday] 内每天 a / b 两个计数键，合并求和后只返回大于阈值 cnt 的日期列表"
+inputs:
+  - {name: "sday", type: "string", required: true, regex: "^\\d{8}$", desc: "起始日期 YYYYMMDD（含）"}
+  - {name: "eday", type: "string", required: true, regex: "^\\d{8}$", desc: "结束日期 YYYYMMDD（含）"}
+  - {name: "cnt", type: "int", required: true, min: 0, desc: "过滤阈值：只返回合并计数大于该值的日期"}
+outputs: []
+
+graph:
+  - id: dates
+    name: "dateRange"
+    desc: "把 [sday, eday] 展开成日期列表"
+    config: {start: "{{ inputs.sday }}", end: "{{ inputs.eday }}", format: "%Y%m%d", limit: 92}
+
+  - id: keysA
+    name: "templateMap"
+    depends: [dates]
+    desc: "按日期拼出 a 组键名"
+    config: {items: "{{ dates }}", template: "counter|daily|a|{{ item }}"}
+
+  - id: keysB
+    name: "templateMap"
+    depends: [dates]
+    desc: "按日期拼出 b 组键名"
+    config: {items: "{{ dates }}", template: "counter|daily|b|{{ item }}"}
+
+  - id: rows
+    name: "redisMGet"
+    depends: [keysA, keysB]
+    desc: "一次 MGET 读取 a + b 两组键，不存在的键跳过"
+    config:
+      dataSource: "redis1"
+      keys: "{{ keysA + keysB }}"
+      format: csv
+      fields: [date, cnt]
+      skipMissing: true
+
+  - id: cast
+    name: "numberCast"
+    depends: [rows]
+    desc: "把 cnt 从字符串转成数值"
+    config: {data: "{{ rows }}", fields: [cnt]}
+
+  - id: merged
+    name: "groupBy"
+    depends: [cast]
+    desc: "按日期分组，合并 a + b 的计数"
+    config: {data: "{{ cast }}", by: date, field: cnt, ops: [sum]}
+
+  - id: filtered
+    name: "rowFilter"
+    depends: [merged]
+    desc: "只保留合并计数大于入参 cnt 的日期（不满足的一天不出现，接口不中断）"
+    config: {data: "{{ merged }}", field: sum, op: gt, value: "{{ inputs.cnt }}"}
+
+  - id: counts
+    name: "renameFields"
+    depends: [filtered]
+    desc: "统计列 sum 改名为 cnt"
+    config: {data: "{{ filtered }}", mapping: {sum: cnt}}
+
+  - name: "respBuilder"
+    depends: [counts]
+    desc: "输出日期计数列表"
+    config: {data: "{{ counts }}"}

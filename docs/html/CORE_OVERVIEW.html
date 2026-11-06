@@ -1,0 +1,544 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>lowcode 核心一页纸</title>
+<style>
+  :root { --ink:#111827; --muted:#6b7280; --line:#e5e7eb; --bg:#fbfbfc; --key:#b45309;
+          --a:#2563eb; --b:#0891b2; --cast:#7c3aed; --group:#059669; --filter:#d97706; --resp:#0f766e; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink);
+         font:14px/1.65 -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif; }
+  .wrap { max-width:1560px; margin:0 auto; padding:24px 14px 40px; }
+  h1 { font-size:25px; margin:0 0 6px; }
+  h2 { font-size:17px; margin:28px 0 10px; }
+  .lead { color:var(--muted); font-size:13.5px; margin:0 0 16px; }
+  code { font:12px ui-monospace, Menlo, Consolas, monospace; background:#f1f5f9; padding:1px 5px; border-radius:3px; }
+
+  .graphwrap { background:transparent; border:none; border-radius:0; padding:0; overflow-x:auto; }
+  .graphwrap svg { display:block; width:100%; min-width:1100px; height:auto; }
+  .graphwrap.wide svg { min-width:1700px; }
+  .graphnote { color:var(--muted); font-size:12px; margin:8px 0 0; }
+
+  table.types { width:100%; border-collapse:collapse; background:#fff; font-size:12px; }
+  table.types th, table.types td { border:1px solid var(--line); padding:6px 9px; text-align:left; vertical-align:top; }
+  table.types th { background:#f3f4f6; font-weight:600; }
+  table.types td:first-child { white-space:nowrap; font:11.5px ui-monospace, Menlo, monospace; }
+  table.types td:nth-child(2) { white-space:nowrap; font:11px ui-monospace, Menlo, monospace; color:#64748b; }
+
+  .design { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .d { background:#fff; border:1px solid var(--line); border-left:3px solid #2563eb; border-radius:7px; padding:9px 12px; }
+  .d:nth-child(even) { border-left-color:#7c3aed; }
+  .d b { display:block; font-size:12.5px; margin-bottom:2px; }
+  .d span { color:var(--muted); font-size:11.5px; }
+
+  /* ---- 数据流 ---- */
+  .req { background:#0f172a; color:#e2e8f0; border-radius:8px; padding:9px 13px;
+         font:12.5px ui-monospace, Menlo, monospace; margin:6px 0 14px; overflow-x:auto; }
+  .req b { color:#7dd3fc; font-weight:600; }
+  .cols { display:grid; grid-template-columns: minmax(0,1.45fr) minmax(0,1fr); gap:16px; align-items:start; }
+  .flow { display:flex; flex-direction:column; }
+  .step { position:relative; display:grid; grid-template-columns:38px 1fr; gap:10px; padding-bottom:12px; }
+  .step::before { content:""; position:absolute; left:18px; top:38px; bottom:0; width:2px; background:#e5e7eb; }
+  .step:last-child::before { display:none; }
+  .step .n { position:relative; z-index:1; width:36px; height:36px; border-radius:50%; color:#fff;
+             display:flex; align-items:center; justify-content:center; font-weight:700; font-size:12.5px; }
+  .step .body { background:#fff; border:1px solid var(--line); border-left:4px solid var(--a);
+                border-radius:8px; padding:8px 11px; }
+  .step .head { display:flex; flex-wrap:wrap; align-items:baseline; gap:8px; }
+  .step .id { font:600 12.5px ui-monospace, Menlo, monospace; }
+  .step .op { font-size:11.5px; color:var(--muted); }
+  .step .rw { margin-top:3px; font-size:11.5px; color:#374151; }
+  .step pre { margin:5px 0 0; padding:6px 8px; background:#f8fafc; border:1px solid #eef2f7;
+              border-radius:5px; overflow-x:auto; font:11.5px/1.5 ui-monospace, Menlo, monospace; color:#0f172a; }
+
+  .board { position:sticky; top:14px; background:#fff; border:1px solid var(--line); border-radius:10px; padding:11px 13px; }
+  .board h3 { font-size:12.5px; margin:0 0 3px; }
+  .board .sub { color:var(--muted); font-size:11.5px; margin:0 0 8px; }
+  .board .k { display:flex; gap:8px; align-items:baseline; padding:4px 0; border-bottom:1px dashed #f1f5f9; }
+  .board .k:last-child { border-bottom:none; }
+  .board .k .key { font:600 11.5px ui-monospace, Menlo, monospace; min-width:64px; }
+  .board .k .val { font:11px ui-monospace, Menlo, monospace; color:#334155; overflow-x:auto; white-space:nowrap; }
+
+  .resp { margin-top:14px; background:#fff; border:1px solid var(--line); border-left:4px solid var(--resp);
+          border-radius:8px; padding:9px 12px; }
+  .resp .t { font-size:12.5px; color:var(--muted); margin-bottom:4px; }
+  .resp pre { margin:0; padding:8px 10px; background:#0f172a; color:#e2e8f0; border-radius:6px;
+              overflow-x:auto; font:12px/1.6 ui-monospace, Menlo, monospace; }
+
+  .tips { margin-top:12px; display:grid; grid-template-columns:repeat(3,1fr); gap:10px; }
+  .tip { background:#fffbeb; border:1px solid #fde68a; border-radius:7px; padding:9px 12px; font-size:11.5px; }
+  .tip b { display:block; color:#b45309; margin-bottom:2px; }
+
+  .keys { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-top:18px; }
+  .key { background:#fff; border:1px solid var(--line); border-left:4px solid var(--key); border-radius:7px; padding:9px 12px; }
+  .key b { display:block; font:600 12px ui-monospace, Menlo, monospace; margin-bottom:3px; }
+  .key span { color:var(--muted); font-size:11.5px; }
+
+  .memo { margin-top:16px; background:#fffbeb; border:1px solid #fde68a; border-radius:8px; padding:9px 14px; font-size:12.5px; }
+  .memo b { color:var(--key); }
+  footer { margin-top:20px; color:var(--muted); font-size:11.5px; }
+
+  @media (max-width: 900px) {
+    .cols, .design, .tips, .keys { grid-template-columns:1fr; }
+    .board { position:static; }
+  }
+
+  .fnlink { cursor: pointer; }
+  .fnlink:hover { fill: #b45309 !important; text-decoration: underline; }
+  .modal { position: fixed; inset: 0; background: rgba(15,23,42,.55); display: flex;
+           align-items: center; justify-content: center; padding: 24px; z-index: 50; }
+  .modal[hidden] { display: none; }
+  .modal-box { background: #fff; border-radius: 10px; width: 100%; max-width: 900px;
+               max-height: 84vh; display: flex; flex-direction: column; overflow: hidden;
+               box-shadow: 0 20px 60px rgba(0,0,0,.25); }
+  .modal-head { display: flex; justify-content: space-between; align-items: center; gap: 12px;
+                padding: 10px 14px; border-bottom: 1px solid var(--line);
+                font: 600 12.5px ui-monospace, Menlo, monospace; color: #0f172a; }
+  .modal-head button { border: none; background: none; font-size: 22px; line-height: 1;
+                       cursor: pointer; color: #6b7280; }
+  .modal pre { margin: 0; padding: 14px 16px; overflow: auto; background: #0f172a;
+               color: #e2e8f0; font: 12px/1.65 ui-monospace, Menlo, Consolas, monospace;
+               white-space: pre; tab-size: 4; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>lowcode 核心一页纸</h1>
+<p class="lead">一张图看懂核心：<b>框 = 代码文件</b>（框内是文件名 / 核心函数 / 职责），<b>箭头 = 跨文件调用</b>（标签是调用点）。
+  加载期只做一次，调用期每请求一次。</p>
+
+<div class="graphwrap"><svg xmlns="http://www.w3.org/2000/svg" width="1345pt" height="482pt" viewBox="0.00 0.00 1345.00 482.00">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(14.4 467.4)">
+<title>core</title>
+<g id="clust1" class="cluster">
+<title>cluster_load</title>
+<path fill="#eff6ff" stroke="#bfdbfe" d="M231.62,-8C231.62,-8 693.5,-8 693.5,-8 699.5,-8 705.5,-14 705.5,-20 705.5,-20 705.5,-172 705.5,-172 705.5,-178 699.5,-184 693.5,-184 693.5,-184 231.62,-184 231.62,-184 225.62,-184 219.62,-178 219.62,-172 219.62,-172 219.62,-20 219.62,-20 219.62,-14 225.62,-8 231.62,-8" />
+<text xml:space="preserve" text-anchor="start" x="416.81" y="-170.55" font-family="PingFang SC" font-weight="bold" font-size="11.00">加载期 · 启动一次</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_run</title>
+<path fill="#ecfdf5" stroke="#a7f3d0" d="M20,-192C20,-192 678.88,-192 678.88,-192 684.88,-192 690.88,-198 690.88,-204 690.88,-204 690.88,-433 690.88,-433 690.88,-439 684.88,-445 678.88,-445 678.88,-445 20,-445 20,-445 14,-445 8,-439 8,-433 8,-433 8,-204 8,-204 8,-198 14,-192 20,-192" />
+<text xml:space="preserve" text-anchor="start" x="298.06" y="-431.55" font-family="PingFang SC" font-weight="bold" font-size="11.00">调用期 · 每请求一次</text>
+</g>
+<g id="clust3" class="cluster">
+<title>cluster_op</title>
+<path fill="#f5f3ff" stroke="#ddd6fe" d="M818.75,-269C818.75,-269 1277.25,-269 1277.25,-269 1283.25,-269 1289.25,-275 1289.25,-281 1289.25,-281 1289.25,-433 1289.25,-433 1289.25,-439 1283.25,-445 1277.25,-445 1277.25,-445 818.75,-445 818.75,-445 812.75,-445 806.75,-439 806.75,-433 806.75,-433 806.75,-281 806.75,-281 806.75,-275 812.75,-269 818.75,-269" />
+<text xml:space="preserve" text-anchor="start" x="985.38" y="-431.55" font-family="PingFang SC" font-weight="bold" font-size="11.00">算子层 · 一个算子一件事</text>
+</g>
+<g id="clust4" class="cluster">
+<title>cluster_base</title>
+<path fill="#f8fafc" stroke="#e2e8f0" d="M1108,-8C1108,-8 1296,-8 1296,-8 1302,-8 1308,-14 1308,-20 1308,-20 1308,-249 1308,-249 1308,-255 1302,-261 1296,-261 1296,-261 1108,-261 1108,-261 1102,-261 1096,-255 1096,-249 1096,-249 1096,-20 1096,-20 1096,-14 1102,-8 1108,-8" />
+<text xml:space="preserve" text-anchor="start" x="1156.25" y="-247.55" font-family="PingFang SC" font-weight="bold" font-size="11.00">基础层 · 公共能力</text>
+</g>
+
+<g id="node1" class="node">
+<title>runtime</title>
+<text xml:space="preserve" text-anchor="start" x="238.62" y="-137.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">runtime.py</text>
+<text xml:space="preserve" text-anchor="start" x="238.62" y="-118.88" font-family="Menlo" font-size="10.00" fill="#2563eb" class="fnlink" data-file="lowcode/runtime.py" data-fns="build_runtime" style="cursor:pointer" font-weight="bold">build_runtime()<title>点击查看源码：lowcode/runtime.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="238.62" y="-104.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">装配根：配置→数据源→编译→执行</text>
+</g>
+
+<g id="node2" class="node">
+<title>loader</title>
+<text xml:space="preserve" text-anchor="start" x="561.25" y="-60.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">config/loader.py</text>
+<text xml:space="preserve" text-anchor="start" x="561.25" y="-41.88" font-family="Menlo" font-size="10.00" fill="#2563eb" class="fnlink" data-file="lowcode/config/loader.py" data-fns="load_config" style="cursor:pointer" font-weight="bold">load_config()<title>点击查看源码：lowcode/config/loader.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="561.25" y="-27.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">读 YAML、结构校验</text>
+</g>
+
+<g id="edge5" class="edge">
+<title>runtime-&gt;loader</title>
+<path fill="none" stroke="#94a3b8" d="M391.6,-101.76C440.7,-88.71 502.33,-72.34 546.08,-60.72" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="546.39,-62.63 551.21,-59.36 545.4,-58.91 546.39,-62.63" />
+<text xml:space="preserve" text-anchor="middle" x="455.25" y="-93.51" font-family="PingFang SC" font-size="8.00" fill="#64748b">load_config</text>
+</g>
+
+<g id="node3" class="node">
+<title>builder</title>
+<text xml:space="preserve" text-anchor="start" x="518.5" y="-137.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">core/builder.py</text>
+<text xml:space="preserve" text-anchor="start" x="518.5" y="-118.88" font-family="Menlo" font-size="10.00" fill="#2563eb" class="fnlink" data-file="lowcode/core/builder.py" data-fns="build_api,compile_node" style="cursor:pointer" font-weight="bold">build_api() · compile_node()<title>点击查看源码：lowcode/core/builder.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="518.5" y="-104.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">编译成 ApiPlan：分层、依赖、结果节点</text>
+</g>
+
+<g id="edge6" class="edge">
+<title>runtime-&gt;builder</title>
+<path fill="none" stroke="#94a3b8" d="M391.6,-123C426.07,-123 466.72,-123 503.03,-123" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="502.74,-124.93 508.24,-123 502.74,-121.08 502.74,-124.93" />
+<text xml:space="preserve" text-anchor="middle" x="455.25" y="-127.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">Builder.build</text>
+</g>
+
+<g id="node9" class="node">
+<title>registry</title>
+<text xml:space="preserve" text-anchor="start" x="825.75" y="-398.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">operators/registry.py</text>
+<text xml:space="preserve" text-anchor="start" x="825.75" y="-379.88" font-family="Menlo" font-size="10.00" fill="#7c3aed" class="fnlink" data-file="lowcode/operators/registry.py" data-fns="create_operator" style="cursor:pointer" font-weight="bold">create_operator()<title>点击查看源码：lowcode/operators/registry.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="825.75" y="-365.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">查表 → 防注入 → 校验 → 实例化 → build</text>
+</g>
+
+<g id="edge10" class="edge">
+<title>builder-&gt;registry</title>
+<path fill="none" stroke="#94a3b8" d="M657.07,-150.49C673.73,-160.58 691.41,-173 705.5,-187 764.94,-246.04 741.52,-293.42 806.75,-346 809.87,-348.51 813.17,-350.87 816.6,-353.08" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="815.11,-354.43 820.81,-355.65 817.11,-351.14 815.11,-354.43" />
+<text xml:space="preserve" text-anchor="middle" x="756.12" y="-328.58" font-family="PingFang SC" font-size="8.00" fill="#64748b">create_operator</text>
+</g>
+
+<g id="node12" class="node">
+<title>template</title>
+<text xml:space="preserve" text-anchor="start" x="1115" y="-60.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">core/template.py</text>
+<text xml:space="preserve" text-anchor="start" x="1115" y="-41.88" font-family="Menlo" font-size="10.00" fill="#475569" class="fnlink" data-file="lowcode/core/template.py" data-fns="compile_template,render" style="cursor:pointer" font-weight="bold">compile_template() · render()<title>点击查看源码：lowcode/core/template.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="1115" y="-27.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">编译并渲染 {{ }} 模板</text>
+</g>
+
+<g id="edge11" class="edge">
+<title>builder-&gt;template</title>
+<path fill="none" stroke="#94a3b8" d="M695.22,-111.18C804.44,-97.11 986.27,-73.67 1099.58,-59.07" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1099.56,-61.01 1104.77,-58.4 1099.06,-57.2 1099.56,-61.01" />
+<text xml:space="preserve" text-anchor="middle" x="910.88" y="-100.3" font-family="PingFang SC" font-size="8.00" fill="#64748b">compile_template</text>
+</g>
+
+<g id="node14" class="node">
+<title>datasources</title>
+<text xml:space="preserve" text-anchor="start" x="1127" y="-137.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">datasources/__init__.py</text>
+<text xml:space="preserve" text-anchor="start" x="1127" y="-118.88" font-family="Menlo" font-size="10.00" fill="#475569" class="fnlink" data-file="lowcode/datasources/__init__.py" data-fns="from_config,resolve" style="cursor:pointer" font-weight="bold">from_config() · resolve()<title>点击查看源码：lowcode/datasources/__init__.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="1127" y="-104.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">实例化数据源、按类别解析</text>
+</g>
+
+<g id="edge12" class="edge">
+<title>builder-&gt;datasources</title>
+<path fill="none" stroke="#94a3b8" d="M695.22,-123C808.33,-123 999.33,-123 1111.44,-123" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1111.36,-124.93 1116.86,-123 1111.36,-121.08 1111.36,-124.93" />
+<text xml:space="preserve" text-anchor="middle" x="910.88" y="-127.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">resolve</text>
+</g>
+
+<g id="node4" class="node">
+<title>view</title>
+<text xml:space="preserve" text-anchor="start" x="27" y="-272.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">web/app.py</text>
+<text xml:space="preserve" text-anchor="start" x="27" y="-253.88" font-family="Menlo" font-size="10.00" fill="#059669" class="fnlink" data-file="lowcode/web/app.py" data-fns="view" style="cursor:pointer" font-weight="bold">view()<title>点击查看源码：lowcode/web/app.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="27" y="-239.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">接收请求、收集参数</text>
+</g>
+
+<g id="edge1" class="edge">
+<title>view-&gt;runtime</title>
+<path fill="none" stroke="#94a3b8" d="M116.72,-231.01C156.54,-208.71 213.07,-177.06 254.64,-153.78" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="255.49,-155.52 259.35,-151.15 253.61,-152.16 255.49,-155.52" />
+<text xml:space="preserve" text-anchor="middle" x="168.62" y="-214.88" font-family="PingFang SC" font-size="8.00" fill="#64748b">create_app</text>
+</g>
+
+<g id="node5" class="node">
+<title>inputs</title>
+<text xml:space="preserve" text-anchor="start" x="252.12" y="-321.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">core/inputs.py</text>
+<text xml:space="preserve" text-anchor="start" x="252.12" y="-302.88" font-family="Menlo" font-size="10.00" fill="#059669" class="fnlink" data-file="lowcode/core/inputs.py" data-fns="parse" style="cursor:pointer" font-weight="bold">parse()<title>点击查看源码：lowcode/core/inputs.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="252.12" y="-288.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">校验入参、类型转换、默认值</text>
+</g>
+
+<g id="edge2" class="edge">
+<title>view-&gt;inputs</title>
+<path fill="none" stroke="#94a3b8" d="M116.72,-267.8C151.01,-274.77 197.71,-284.26 236.57,-292.15" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="235.97,-294 241.74,-293.21 236.74,-290.22 235.97,-294" />
+<text xml:space="preserve" text-anchor="middle" x="168.62" y="-286.9" font-family="PingFang SC" font-size="8.00" fill="#64748b">parse</text>
+</g>
+
+<g id="node6" class="node">
+<title>executor</title>
+<text xml:space="preserve" text-anchor="start" x="229.25" y="-398.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">core/executor.py</text>
+<text xml:space="preserve" text-anchor="start" x="229.25" y="-379.88" font-family="Menlo" font-size="10.00" fill="#059669" class="fnlink" data-file="lowcode/core/executor.py" data-fns="run_node" style="cursor:pointer" font-weight="bold">run_node()<title>点击查看源码：lowcode/core/executor.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="229.25" y="-365.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">渲染 → execute → 写黑板（唯一入口）</text>
+</g>
+
+<g id="edge3" class="edge">
+<title>view-&gt;executor</title>
+<path fill="none" stroke="#94a3b8" d="M112.31,-285.51C142.05,-303.69 182.55,-327.48 219.62,-346 224.75,-348.56 230.09,-351.11 235.5,-353.6" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="234.69,-355.35 240.49,-355.87 236.28,-351.84 234.69,-355.35" />
+<text xml:space="preserve" text-anchor="middle" x="168.62" y="-332.6" font-family="PingFang SC" font-size="8.00" fill="#64748b">run</text>
+</g>
+
+<g id="node8" class="node">
+<title>response</title>
+<text xml:space="preserve" text-anchor="start" x="246.12" y="-244.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">web/response.py</text>
+<text xml:space="preserve" text-anchor="start" x="246.12" y="-225.88" font-family="Menlo" font-size="10.00" fill="#059669" class="fnlink" data-file="lowcode/web/response.py" data-fns="envelope" style="cursor:pointer" font-weight="bold">envelope()<title>点击查看源码：lowcode/web/response.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="246.12" y="-211.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">包成 {code, msg, traceId, data}</text>
+</g>
+
+<g id="edge4" class="edge">
+<title>view-&gt;response</title>
+<path fill="none" stroke="#94a3b8" d="M116.72,-252.4C149.19,-248.63 192.78,-243.57 230.3,-239.21" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="230.49,-241.13 235.73,-238.58 230.05,-237.3 230.49,-241.13" />
+<text xml:space="preserve" text-anchor="middle" x="168.62" y="-252.54" font-family="PingFang SC" font-size="8.00" fill="#64748b">envelope</text>
+</g>
+
+<g id="edge8" class="edge">
+<title>executor-&gt;builder</title>
+<path fill="none" stroke="#94a3b8" d="M387.67,-356.38C392.43,-353.25 396.93,-349.8 401,-346 423.22,-325.24 415.6,-310.61 432,-285 461.95,-238.24 469.05,-225.04 509.5,-187 522.01,-175.23 536.84,-163.97 550.89,-154.26" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="551.72,-156.02 555.19,-151.34 549.56,-152.84 551.72,-156.02" />
+<text xml:space="preserve" text-anchor="middle" x="455.25" y="-289.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">resolve_args</text>
+</g>
+
+<g id="node7" class="node">
+<title>context</title>
+<text xml:space="preserve" text-anchor="start" x="533.12" y="-398.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">core/context.py</text>
+<text xml:space="preserve" text-anchor="start" x="533.12" y="-379.88" font-family="Menlo" font-size="10.00" fill="#059669" class="fnlink" data-file="lowcode/core/context.py" data-fns="set_output,record" style="cursor:pointer" font-weight="bold">set_output() · record()<title>点击查看源码：lowcode/core/context.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="533.12" y="-365.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">请求黑板：上游输出、trace、耗时</text>
+</g>
+
+<g id="edge7" class="edge">
+<title>executor-&gt;context</title>
+<path fill="none" stroke="#94a3b8" d="M400.96,-384C438.08,-384 480.93,-384 517.46,-384" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="517.2,-385.93 522.7,-384 517.2,-382.08 517.2,-385.93" />
+<text xml:space="preserve" text-anchor="middle" x="455.25" y="-388.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">set_output</text>
+</g>
+
+<g id="node11" class="node">
+<title>redis</title>
+<text xml:space="preserve" text-anchor="start" x="840.75" y="-321.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">operators/&lt;分类&gt;/&lt;算子&gt;.py</text>
+<text xml:space="preserve" text-anchor="start" x="840.75" y="-302.88" font-family="Menlo" font-size="10.00" fill="#7c3aed" class="fnlink" data-file="lowcode/operators/external/uredis/redisGet.py" data-fns="build,execute" style="cursor:pointer" font-weight="bold">build() · execute()<title>点击查看源码：lowcode/operators/external/uredis/redisGet.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="840.75" y="-288.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">具体算子，如 redisGet 读键并解析</text>
+</g>
+
+<g id="edge9" class="edge">
+<title>executor-&gt;redis</title>
+<path fill="none" stroke="#94a3b8" d="M400.51,-357.31C434.34,-348.15 473.42,-338.77 509.5,-333 617.55,-315.72 743.74,-309.86 825.14,-307.91" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="824.93,-309.84 830.38,-307.79 824.84,-305.99 824.93,-309.84" />
+<text xml:space="preserve" text-anchor="middle" x="602.5" y="-337.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">execute</text>
+</g>
+
+<g id="node10" class="node">
+<title>base</title>
+<text xml:space="preserve" text-anchor="start" x="1133.75" y="-398.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">operators/base.py</text>
+<text xml:space="preserve" text-anchor="start" x="1133.75" y="-379.88" font-family="Menlo" font-size="10.00" fill="#7c3aed" class="fnlink" data-file="lowcode/operators/base.py" data-fns="build,execute" style="cursor:pointer" font-weight="bold">build() · execute()<title>点击查看源码：lowcode/operators/base.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="1133.75" y="-365.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">算子契约：启动一次 / 每请求一次</text>
+</g>
+
+<g id="edge14" class="edge">
+<title>registry-&gt;base</title>
+<path fill="none" stroke="#94a3b8" d="M1004.95,-384C1041.32,-384 1082.69,-384 1118.02,-384" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1117.99,-385.93 1123.49,-384 1117.99,-382.08 1117.99,-385.93" />
+<text xml:space="preserve" text-anchor="middle" x="1055.5" y="-388.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">Operator()</text>
+</g>
+
+<g id="node13" class="node">
+<title>spec</title>
+<text xml:space="preserve" text-anchor="start" x="1124" y="-214.12" font-family="PingFang SC" font-weight="bold" font-size="10.00">spec.py</text>
+<text xml:space="preserve" text-anchor="start" x="1124" y="-195.88" font-family="Menlo" font-size="10.00" fill="#475569" class="fnlink" data-file="lowcode/spec.py" data-fns="validate,is_template" style="cursor:pointer" font-weight="bold">validate() · is_template()<title>点击查看源码：lowcode/spec.py</title></text>
+<text xml:space="preserve" text-anchor="start" x="1124" y="-181.12" font-family="PingFang SC" font-size="9.00" fill="#6b7280">配置字段声明与校验</text>
+</g>
+
+<g id="edge13" class="edge">
+<title>registry-&gt;spec</title>
+<path fill="none" stroke="#94a3b8" d="M986.25,-356.42C992.74,-353.19 999.08,-349.71 1005,-346 1051.11,-317.06 1052.35,-296.53 1096,-264 1111.55,-252.41 1129.29,-240.99 1145.7,-231.07" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1146.65,-232.75 1150.38,-228.27 1144.67,-229.44 1146.65,-232.75" />
+<text xml:space="preserve" text-anchor="middle" x="1055.5" y="-326.07" font-family="PingFang SC" font-size="8.00" fill="#64748b">validate</text>
+</g>
+
+<g id="edge15" class="edge">
+<title>redis-&gt;datasources</title>
+<path fill="none" stroke="#94a3b8" d="M940.36,-279.51C974.83,-247.46 1035.79,-194.59 1096,-161 1101.16,-158.12 1106.58,-155.39 1112.12,-152.81" />
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1112.58,-154.72 1116.8,-150.7 1111,-151.21 1112.58,-154.72" />
+<text xml:space="preserve" text-anchor="middle" x="1055.5" y="-203.92" font-family="PingFang SC" font-size="8.00" fill="#64748b">get()</text>
+</g>
+</g>
+</svg></div>
+<p class="graphnote">四个分区：加载期（启动一次）→ 调用期（每请求一次）；算子层与基础层是它们共用的支撑。点击函数名可查看完整源码。</p>
+
+<h2>数据是怎么流的 · counter/merge</h2>
+<p class="lead">框 = 一个算子：第一行「id · 算子」，第二行是它输出的数据形态，第三行写进黑板哪个 key；箭头上的 <code>{{ }}</code> 就是数据的来源。</p>
+<div class="graphwrap wide"><svg width="1436pt" height="201pt"
+ viewBox="0.00 0.00 1436.00 201.00" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+<g id="graph0" class="graph" transform="scale(1 1) rotate(0) translate(8.64 192.64)">
+<title>dataflow</title>
+<g id="clust1" class="cluster">
+<title>cluster_in</title>
+<path fill="#f8fafc" stroke="#e2e8f0" d="M20,-18C20,-18 144,-18 144,-18 150,-18 156,-24 156,-30 156,-30 156,-95 156,-95 156,-101 150,-107 144,-107 144,-107 20,-107 20,-107 14,-107 8,-101 8,-95 8,-95 8,-30 8,-30 8,-24 14,-18 20,-18"/>
+<text xml:space="preserve" text-anchor="start" x="72.25" y="-94.5" font-family="PingFang SC" font-weight="bold" font-size="10.00">请求</text>
+</g>
+<g id="clust2" class="cluster">
+<title>cluster_read</title>
+<path fill="#eff6ff" stroke="#bfdbfe" d="M255.25,-17C255.25,-17 439.25,-17 439.25,-17 445.25,-17 451.25,-23 451.25,-29 451.25,-29 451.25,-164 451.25,-164 451.25,-170 445.25,-176 439.25,-176 439.25,-176 255.25,-176 255.25,-176 249.25,-176 243.25,-170 243.25,-164 243.25,-164 243.25,-29 243.25,-29 243.25,-23 249.25,-17 255.25,-17"/>
+<text xml:space="preserve" text-anchor="start" x="307.5" y="-163.5" font-family="PingFang SC" font-weight="bold" font-size="10.00">读数据 · external</text>
+</g>
+<g id="clust3" class="cluster">
+<title>cluster_work</title>
+<path fill="#f5f3ff" stroke="#ddd6fe" d="M513.75,-20C513.75,-20 1112,-20 1112,-20 1118,-20 1124,-26 1124,-32 1124,-32 1124,-99 1124,-99 1124,-105 1118,-111 1112,-111 1112,-111 513.75,-111 513.75,-111 507.75,-111 501.75,-105 501.75,-99 501.75,-99 501.75,-32 501.75,-32 501.75,-26 507.75,-20 513.75,-20"/>
+<text xml:space="preserve" text-anchor="start" x="738.62" y="-98.5" font-family="PingFang SC" font-weight="bold" font-size="10.00">加工 · transformer / aggregate</text>
+</g>
+<g id="clust4" class="cluster">
+<title>cluster_out</title>
+<path fill="#ecfdf5" stroke="#a7f3d0" d="M1208.25,-20C1208.25,-20 1398.25,-20 1398.25,-20 1404.25,-20 1410.25,-26 1410.25,-32 1410.25,-32 1410.25,-99 1410.25,-99 1410.25,-105 1404.25,-111 1398.25,-111 1398.25,-111 1208.25,-111 1208.25,-111 1202.25,-111 1196.25,-105 1196.25,-99 1196.25,-99 1196.25,-32 1196.25,-32 1196.25,-26 1202.25,-20 1208.25,-20"/>
+<text xml:space="preserve" text-anchor="start" x="1293.5" y="-98.5" font-family="PingFang SC" font-weight="bold" font-size="10.00">输出</text>
+</g>
+<!-- inputs -->
+<g id="node1" class="node">
+<title>inputs</title>
+<text xml:space="preserve" text-anchor="start" x="25" y="-63.35" font-family="PingFang SC" font-weight="bold" font-size="9.50">inputs</text>
+<text xml:space="preserve" text-anchor="start" x="25" y="-46.12" font-family="Menlo" font-size="9.50" fill="#0f172a">date = &quot;2026&#45;11&#45;04&quot;</text>
+<text xml:space="preserve" text-anchor="start" x="25" y="-32.88" font-family="Menlo" font-size="9.50" fill="#0f172a">cnt = 8</text>
+</g>
+<!-- a -->
+<g id="node2" class="node">
+<title>a</title>
+<text xml:space="preserve" text-anchor="start" x="260.25" y="-131.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">a · redisGet</text>
+<text xml:space="preserve" text-anchor="start" x="260.25" y="-114.5" font-family="Menlo" font-size="9.50" fill="#0f172a">{date:&quot;2026&#45;11&#45;04&quot;, cnt:&quot;10&quot;}</text>
+<text xml:space="preserve" text-anchor="start" x="260.25" y="-101.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;a&quot;]</text>
+</g>
+<!-- inputs&#45;&gt;a -->
+<g id="edge1" class="edge">
+<title>inputs&#45;&gt;a</title>
+<path fill="none" stroke="#94a3b8" d="M147.74,-67.72C176.99,-75.28 212.26,-84.39 244.9,-92.82"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="244.11,-94.61 249.92,-94.12 245.08,-90.88 244.11,-94.61"/>
+<text xml:space="preserve" text-anchor="middle" x="199.62" y="-91.44" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ inputs.date }}</text>
+</g>
+<!-- b -->
+<g id="node3" class="node">
+<title>b</title>
+<text xml:space="preserve" text-anchor="start" x="263.25" y="-63.73" font-family="PingFang SC" font-weight="bold" font-size="9.50">b · redisGet</text>
+<text xml:space="preserve" text-anchor="start" x="263.25" y="-46.5" font-family="Menlo" font-size="9.50" fill="#0f172a">{date:&quot;2026&#45;11&#45;05&quot;, cnt:&quot;7&quot;}</text>
+<text xml:space="preserve" text-anchor="start" x="263.25" y="-33.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;b&quot;]</text>
+</g>
+<!-- inputs&#45;&gt;b -->
+<g id="edge2" class="edge">
+<title>inputs&#45;&gt;b</title>
+<path fill="none" stroke="#94a3b8" d="M147.74,-51C177.85,-51 214.33,-51 247.75,-51"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="247.38,-52.93 252.88,-51 247.38,-49.08 247.38,-52.93"/>
+<text xml:space="preserve" text-anchor="middle" x="199.62" y="-55.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ inputs.date }}</text>
+</g>
+<!-- filtered -->
+<g id="node6" class="node">
+<title>filtered</title>
+<text xml:space="preserve" text-anchor="start" x="1024.5" y="-66.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">filtered · rowFilter</text>
+<text xml:space="preserve" text-anchor="start" x="1024.5" y="-49.5" font-family="Menlo" font-size="9.50" fill="#0f172a">[{sum:10}]</text>
+<text xml:space="preserve" text-anchor="start" x="1024.5" y="-36.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;filtered&quot;]</text>
+</g>
+<!-- inputs&#45;&gt;filtered -->
+<g id="edge3" class="edge">
+<title>inputs&#45;&gt;filtered</title>
+<path fill="none" stroke="#94a3b8" d="M147.78,-31.28C200.65,-16.93 277.58,0 346.25,0 346.25,0 346.25,0 858.5,0 910.85,0 968.31,-16.48 1009.25,-31.23"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1008.43,-32.98 1014.26,-33.07 1009.75,-29.37 1008.43,-32.98"/>
+<text xml:space="preserve" text-anchor="middle" x="611.75" y="-4.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ inputs.cnt }}</text>
+</g>
+<!-- cast -->
+<g id="node4" class="node">
+<title>cast</title>
+<text xml:space="preserve" text-anchor="start" x="518.75" y="-66.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">cast · numberCast</text>
+<text xml:space="preserve" text-anchor="start" x="518.75" y="-49.5" font-family="Menlo" font-size="9.50" fill="#0f172a">[{date, cnt:10}, {date, cnt:7}]</text>
+<text xml:space="preserve" text-anchor="start" x="518.75" y="-36.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;cast&quot;]</text>
+</g>
+<!-- a&#45;&gt;cast -->
+<g id="edge4" class="edge">
+<title>a&#45;&gt;cast</title>
+<path fill="none" stroke="#94a3b8" d="M443.02,-95.53C462.55,-90.7 483.24,-85.57 503.19,-80.63"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="503.57,-82.52 508.45,-79.33 502.65,-78.79 503.57,-82.52"/>
+<text xml:space="preserve" text-anchor="middle" x="476.5" y="-92.85" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ a }}</text>
+</g>
+<!-- b&#45;&gt;cast -->
+<g id="edge5" class="edge">
+<title>b&#45;&gt;cast</title>
+<path fill="none" stroke="#94a3b8" d="M440.06,-52.05C460.47,-52.28 482.29,-52.53 503.26,-52.77"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="503.01,-54.69 508.53,-52.83 503.05,-50.84 503.01,-54.69"/>
+<text xml:space="preserve" text-anchor="middle" x="476.5" y="-56.99" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ b }}</text>
+</g>
+<!-- grouped -->
+<g id="node5" class="node">
+<title>grouped</title>
+<text xml:space="preserve" text-anchor="start" x="800.5" y="-66.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">grouped · groupBy</text>
+<text xml:space="preserve" text-anchor="start" x="800.5" y="-49.5" font-family="Menlo" font-size="9.50" fill="#0f172a">[{sum:10}, {sum:7}]</text>
+<text xml:space="preserve" text-anchor="start" x="800.5" y="-36.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">写 _outputs[&quot;grouped&quot;]</text>
+</g>
+<!-- cast&#45;&gt;grouped -->
+<g id="edge6" class="edge">
+<title>cast&#45;&gt;grouped</title>
+<path fill="none" stroke="#94a3b8" d="M713.65,-54C737.51,-54 762.47,-54 784.73,-54"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="784.54,-55.93 790.04,-54 784.54,-52.08 784.54,-55.93"/>
+<text xml:space="preserve" text-anchor="middle" x="752.62" y="-58.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ cast }}</text>
+</g>
+<!-- grouped&#45;&gt;filtered -->
+<g id="edge7" class="edge">
+<title>grouped&#45;&gt;filtered</title>
+<path fill="none" stroke="#94a3b8" d="M923.48,-54C950.9,-54 982.51,-54 1008.87,-54"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1008.79,-55.93 1014.29,-54 1008.79,-52.08 1008.79,-55.93"/>
+<text xml:space="preserve" text-anchor="middle" x="969.5" y="-58.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ grouped }}</text>
+</g>
+<!-- resp -->
+<g id="node7" class="node">
+<title>resp</title>
+<text xml:space="preserve" text-anchor="start" x="1213.25" y="-66.72" font-family="PingFang SC" font-weight="bold" font-size="9.50">respBuilder</text>
+<text xml:space="preserve" text-anchor="start" x="1213.25" y="-49.5" font-family="Menlo" font-size="9.50" fill="#0f172a">data: [{date:&quot;11&#45;04&quot;, sum:10}]</text>
+<text xml:space="preserve" text-anchor="start" x="1213.25" y="-36.25" font-family="PingFang SC" font-size="8.00" fill="#6b7280">结果节点 → 响应 data</text>
+</g>
+<!-- filtered&#45;&gt;resp -->
+<g id="edge8" class="edge">
+<title>filtered&#45;&gt;resp</title>
+<path fill="none" stroke="#94a3b8" d="M1115.83,-54C1139.67,-54 1169.27,-54 1197.82,-54"/>
+<polygon fill="#94a3b8" stroke="#94a3b8" points="1197.65,-55.93 1203.15,-54 1197.65,-52.08 1197.65,-55.93"/>
+<text xml:space="preserve" text-anchor="middle" x="1160.12" y="-58.4" font-family="PingFang SC" font-size="8.00" fill="#64748b">{{ filtered }}</text>
+</g>
+</g>
+</svg></div>
+<p class="graphnote">读入 → 数值化 → 分组求和 → 过滤 → 输出；每个节点的输出都进 <code>Context._outputs</code>，下游按 id 取。</p>
+
+<h2>核心类型</h2>
+<table class="types">
+  <tr><th>类型</th><th>位置</th><th>关键字段 / 方法</th><th>作用</th></tr>
+  <tr><td>ServerDef / GroupDef / ApiDef / NodeDef</td><td>config/models.py</td><td>name · method · path · inputs · outputs · graph</td><td>YAML 的强类型模型，启动期校验后产出</td></tr>
+  <tr><td>InputDef / OutputDef</td><td>config/models.py</td><td>name · type · required · default · regex/enum/min/max</td><td>入参与响应字段契约；outputs 与 respBuilder 模板对账</td></tr>
+  <tr><td>Field</td><td>spec.py</td><td>type · required · default · choices · dynamic · raw</td><td>算子 config 的字段声明：dynamic 由框架渲染，raw 交给算子自己渲染</td></tr>
+  <tr><td>PlanNode</td><td>core/builder.py</td><td>id · op · depends · static · dynamic</td><td>编译后的节点：算子实例 + 静态参数 + 已编译模板</td></tr>
+  <tr><td>ApiPlan</td><td>core/builder.py</td><td>inputs · nodes · levels · result · timeout</td><td>编译后的接口计划，请求期只读复用</td></tr>
+  <tr><td>Context</td><td>core/context.py</td><td>inputs · request · _outputs · trace</td><td>请求级黑板：节点按 id 写输出，下游按 id 读取</td></tr>
+  <tr><td>InputSchema</td><td>core/inputs.py</td><td>defs · parse()</td><td>启动期构造、请求期校验入参（含类型转换与默认值）</td></tr>
+  <tr><td>Operator</td><td>operators/base.py</td><td>name · category · spec · build() · execute()</td><td>算子契约：build() 启动一次，execute() 每请求一次</td></tr>
+  <tr><td>DataSource / DataSourceManager</td><td>datasources/__init__.py</td><td>kind · spec · check() · resolve()</td><td>数据源能力（sql / http / kv）与按类别解析</td></tr>
+  <tr><td>Template</td><td>core/template.py</td><td>names · inputs · render()</td><td>编译后的模板：启动期编译，请求期用 scope 渲染</td></tr>
+  <tr><td>Runtime</td><td>runtime.py</td><td>server · datasources · plans · executor</td><td>一次装配的完整产物，Web 与 CLI 只依赖它</td></tr>
+  <tr><td>错误族</td><td>errors.py</td><td>ConfigError · ParamError · BizError · ExecError · DeadlineError · UpstreamError</td><td>启动期 / 参数 / 业务 / 框架 / 超时 / 上游 六类错误</td></tr>
+</table>
+
+<h2>设计要点</h2>
+<div class="design">
+  <div class="d"><b>四层模型</b><span>server → group → api → 算子 DAG；文件名三段即路由，一个接口一个文件。</span></div>
+  <div class="d"><b>启动期编译一次</b><span>YAML → ApiPlan：结构、引用、模板、outputs 对账、依赖探测全在启动期完成，错误前置。</span></div>
+  <div class="d"><b>请求期只读计划</b><span>每个请求只做入参校验、模板渲染、execute 与黑板写入，不再解析 YAML。</span></div>
+  <div class="d"><b>三类 config 字段</b><span>static 原样固化；dynamic 框架编译并渲染；raw 框架不碰、算子自己渲染。</span></div>
+  <div class="d"><b>按 id 引用上游</b><span>节点输出写入黑板，下游用 {{ 节点id }} 读取；只能引用 depends 链上的祖先，启动期校验。</span></div>
+  <div class="d"><b>单一职责算子</b><span>按 filter / transformer / external / aggregate / selector 分类，一个算子只做一件事。</span></div>
+  <div class="d"><b>错误分层</b><span>ConfigError 启动期；ParamError 400；BizError 业务码；ExecError 500；Deadline 504；Upstream 502。</span></div>
+  <div class="d"><b>不原地修改</b><span>args、上游输出、静态 config 在节点间共享；算子必须返回新对象，契约测试强制检查。</span></div>
+  <div class="d"><b>测试同路径</b><span>算子用例与线上都走 compile_node() + run_node()，用例通过 ≈ 线上行为正确。</span></div>
+  <div class="d"><b>不提供分支循环</b><span>guard + 表达式覆盖常见的前置条件；复杂逻辑写成自定义算子，而不是把 YAML 变成编程语言。</span></div>
+</div>
+
+<div class="memo">
+  <b>一句话记住：</b>加载期只做一次（YAML → ApiPlan），调用期每请求一次（ApiPlan → 响应）。
+  加新算子 = 在 <code>operators/&lt;分类&gt;/</code> 写一个类，声明 <code>spec</code>，实现 <code>build()</code> 与 <code>execute()</code>。
+</div>
+
+<footer>极简版 · 需要完整调用细节时再看 <a href="ARCHITECTURE.html">ARCHITECTURE.html</a>。</footer>
+</div>
+
+<div id="modal" class="modal" hidden>
+  <div class="modal-box">
+    <div class="modal-head"><span id="modal-title"></span><button id="modal-close" title="关闭">×</button></div>
+    <pre id="modal-code"></pre>
+  </div>
+</div>
+<script>
+const SRC = {"lowcode/runtime.py::build_runtime": "def build_runtime(conf_dir: Union[str, Path]) -> Runtime:\n    \"\"\"按启动顺序装配。结构错误与语义错误汇总后一次性抛出（ConfigError.errors 为全部条目）。\n\n    server.yaml 本身、数据源有误时后续步骤无从进行，到此为止；\n    单个分组 / 接口文件有误时只跳过它，其余文件继续编译，以便一次暴露全部问题。\n    \"\"\"\n    errors = ErrorCollector()\n    server = load_config(conf_dir, errors)                                  # ① 配置层：结构校验\n    with errors.collect():\n        datasources = DataSourceManager.from_config(server.data_sources, server.root)  # ② 数据源：实例化 + 自检\n        plans = Builder(server, datasources).build(errors)                  # ③ 编译：ApiDef → ApiPlan\n    errors.raise_if_any()\n    executor = Executor(server.parallel, server.workers)                    # ④ 执行器\n    return Runtime(server, datasources, plans, executor)", "lowcode/config/loader.py::load_config": "def load_config(root: Union[str, Path], errors: Optional[ErrorCollector] = None) -> ServerDef:\n    \"\"\"加载配置目录。传入 errors 时错误追加、出错文件跳过（供 runtime 把结构/语义错误一次列全）。\"\"\"\n    root = Path(root).resolve()\n    server_path = root / SERVER_FILE\n    if not server_path.is_file():\n        raise ConfigError(f\"config file not found: {SERVER_FILE}\", str(root))\n\n    raw = _expand_env(read_yaml(server_path, SERVER_FILE), SERVER_FILE)\n    top = validate(raw, SERVER_FILE_SPEC, SERVER_FILE)\n    srv = validate(top[\"server\"], SERVER_SPEC, child(SERVER_FILE, \"server\"))\n    _check_datasources(top[\"dataSources\"])\n\n    collector = errors if errors is not None else ErrorCollector()\n    groups = _scan(root, collector)\n    if errors is None:\n        collector.raise_if_any()\n    if not collector.errors and not any(g.apis for g in groups):\n        raise ConfigError(f\"no apis found: add {_LAYOUT_HINT} under the config directory\", str(root))\n\n    return ServerDef(\n        name=top[\"name\"], host=srv[\"host\"], port=srv[\"port\"], prefix=srv[\"prefix\"],\n        timeout=srv[\"timeout\"], parallel=srv[\"parallel\"], workers=srv[\"workers\"],\n        debug=srv[\"debug\"], meta=srv[\"meta\"], log_level=srv[\"logLevel\"],\n        data_sources=top[\"dataSources\"], root=root, groups=groups,\n    )", "lowcode/core/builder.py::build_api": "    def build_api(self, group: GroupDef, api: ApiDef) -> ApiPlan:\n        url = self._url(api)\n        inputs = InputSchema(_with_path_params(api, url), child(api.where, \"inputs\"))\n\n        defs = _resolve_nodes(api)\n        graph = Graph({n.id: n.depends for n in defs}, child(api.where, \"graph\"))\n        levels = graph.levels()\n        result = defs[-1].id\n        _check_reachable(defs, graph, result)\n\n        all_ids = {n.id for n in defs}\n        nodes: Dict[str, PlanNode] = {}\n        for n in defs:\n            env = BuildEnv(self.datasources, group, n.where)\n            nodes[n.id] = compile_node(n, env, graph.ancestors(n.id), all_ids, inputs.names)\n\n        timeout = next(t for t in (api.timeout, group.timeout, self.server.timeout) if t is not None)\n        if timeout <= 0:\n            raise ConfigError(f\"timeout must be > 0, got {timeout}\", api.where)\n        _check_outputs(api, nodes[result])\n        return ApiPlan(api=api, group=group, url=url, rule=_PATH_PARAM.sub(r\"<\\1>\", url),\n                       inputs=inputs, nodes=nodes, levels=levels, result=result, timeout=timeout)", "lowcode/core/builder.py::compile_node": "def compile_node(node: NodeDef, env: BuildEnv, ancestors: Set[str], all_ids: Set[str],\n                 input_names: Sequence[str]) -> PlanNode:\n    \"\"\"编译单个节点（id / depends 须已补齐）。与算子测试框架共用，保证测试路径 = 线上路径。\"\"\"\n    op = create_operator(node.name, node.id, node.config, env)\n    static, dynamic = _compile_config(op, node, ancestors, all_ids, input_names)\n    return PlanNode(node.id, op, tuple(node.depends), static, dynamic, desc=node.desc)", "lowcode/web/app.py::view": "    def view(**path_params: Any):\n        inputs = plan.inputs.parse(_collect_params(path_params))\n        ctx = Context(inputs, request=_request_info(), timeout=plan.timeout, trace_id=g.trace_id)\n        g.ctx = ctx  # after_request 用它把节点耗时写入服务端日志\n        data = rt.executor.run(plan, ctx)\n        return envelope(0, \"ok\", data, ctx.trace_id)", "lowcode/core/inputs.py::parse": "    def parse(self, raw: Mapping[str, Any]) -> Dict[str, Any]:\n        \"\"\"校验原始参数，返回只含已声明入参的 dict。所有错误一次列全。\"\"\"\n        out: Dict[str, Any] = {}\n        errors: List[str] = []\n        for d in self.defs:\n            try:\n                out[d.name] = self._parse_one(d, raw.get(d.name))\n            except ValueError as e:\n                errors.append(f\"{d.name} {e}\")\n        if errors:\n            raise ParamError(\"参数错误：\" + \"；\".join(errors))\n        return out", "lowcode/core/executor.py::run_node": "    def run_node(node: PlanNode, ctx: Context) -> None:\n        \"\"\"执行单个节点并把输出写入黑板（所有节点执行的唯一入口）。\"\"\"\n        start = time.perf_counter()\n        error = \"\"\n        try:\n            args = node.resolve_args(ctx.scope())\n            ctx.set_output(node.id, node.op.execute(ctx, args))\n        except BizError as e:          # 业务错误是给调用方看的，原样透出\n            error = e.msg\n            raise\n        except LowcodeError as e:      # 框架错误：加上节点前缀便于定位\n            error = e.at_node(node.id).msg\n            raise\n        except Exception as e:         # noqa: BLE001  非预期异常统一包装为 500\n            err = ExecError(f\"{type(e).__name__}: {e}\").at_node(node.id)\n            error = err.msg\n            raise err from e\n        finally:\n            ctx.record(node.id, node.op.name, (time.perf_counter() - start) * 1000, error,\n                       desc=node.effective_desc)", "lowcode/core/context.py::set_output": "    def set_output(self, node_id: str, value: Any) -> None:\n        with self._lock:\n            self._outputs[node_id] = value", "lowcode/core/context.py::record": "    def record(self, node_id: str, op: str, ms: float, error: str = \"\", desc: str = \"\") -> None:\n        with self._lock:\n            entry = {\"node\": node_id, \"op\": op, \"ms\": round(ms, 2), \"error\": error}\n            if desc:\n                entry[\"desc\"] = desc  # 节点在做什么，请求日志里一眼可读\n            self.trace.append(entry)", "lowcode/operators/registry.py::create_operator": "def create_operator(name: str, node_id: str, config: Dict[str, Any], env: \"BuildEnv\") -> Operator:\n    \"\"\"工厂：查表 → 拒绝非 dynamic 字段写模板（杜绝 SQL 注入）→ 按 spec 校验 → build() 异常带定位。\"\"\"\n    cls = get_operator(name, env.where)\n    where = child(env.where, \"config\")\n    if isinstance(config, dict):\n        for key, f in cls.spec.items():\n            if not f.dynamic and not f.raw and is_template(config.get(key)):\n                raise ConfigError(f\"field {key} does not support {{{{ }}}} templates(only dynamic fields do; see /_operators)\",\n                                  child(where, key))\n    conf = validate(config, cls.spec, where)\n    op = cls(node_id, conf, env)\n    try:\n        op.build()\n    except ConfigError:\n        raise\n    except Exception as e:  # noqa: BLE001  任何构建期异常都要带上定位\n        raise ConfigError(f\"operator {name} build failed: {type(e).__name__}: {e}\", env.where) from e\n    return op", "lowcode/operators/base.py::build": "    def build(self) -> None:\n        \"\"\"启动期调用一次：把能提前做的事都做掉，让错误在启动时暴露。\"\"\"", "lowcode/operators/base.py::execute": "    def execute(self, ctx: \"Context\", args: Dict[str, Any]) -> Any:\n        \"\"\"处理一次请求。args 是渲染后的 config（dynamic 字段已取值）。\"\"\"\n        raise NotImplementedError(f\"算子 {self.name} 未实现 execute()\")", "lowcode/operators/external/uredis/redisGet.py::build": "    def build(self) -> None:\n        self.ds = self.env.datasource(self.config[\"dataSource\"], \"kv\")\n        check_config(self.config, self.config_error)", "lowcode/operators/external/uredis/redisGet.py::execute": "    def execute(self, ctx: Any, args: Dict[str, Any]) -> Any:\n        key = args[\"key\"]\n        if self.config[\"command\"] == \"hgetall\":\n            data = self.ds.hgetall(key)\n            return {k: parse_value(self.config, v, key) for k, v in data.items()} if data else args[\"default\"]\n        raw = self.ds.get(key)\n        return args[\"default\"] if raw is None else parse_value(self.config, raw, key)", "lowcode/core/template.py::compile_template": "def compile_template(value: Any, where: str) -> Template:\n    \"\"\"把配置值编译成 Template（启动期调用，语法错误抛 ConfigError）。\"\"\"\n    if isinstance(value, str):\n        if \"{{\" not in value and \"{%\" not in value:\n            return _Const(value)\n        m = _WHOLE.match(value)\n        return _Expr(m.group(\"expr\"), where) if m else _Text(value, where)\n    if isinstance(value, dict):\n        return _Composite(((k, compile_template(v, f\"{where}.{k}\")) for k, v in value.items()), True)\n    if isinstance(value, list):\n        return _Composite(((i, compile_template(v, f\"{where}[{i}]\")) for i, v in enumerate(value)), False)\n    return _Const(value)", "lowcode/core/template.py::render": "    def render(self, scope: Dict[str, Any]) -> Any:\n        raise NotImplementedError", "lowcode/spec.py::validate": "def validate(data: Any, spec: Mapping[str, Field], where: str) -> Dict[str, Any]:\n    \"\"\"按 spec 校验映射，返回补齐默认值后的新 dict（dynamic 模板字符串跳过类型检查）。\"\"\"\n    if data is None:\n        data = {}\n    if not isinstance(data, Mapping):\n        raise ConfigError(f\"expected a mapping, got {kind_of(data)}\", where)\n\n    for key in data:\n        if key not in spec:\n            raise ConfigError(f\"unknown field {key!r}{suggest(str(key), list(spec))}\", where)\n\n    out: Dict[str, Any] = {}\n    for key, field in spec.items():\n        path = child(where, key)\n        value = data.get(key)\n        if value is None:\n            if field.required:\n                raise ConfigError(\"missing required field\", path)\n            out[key] = copy.deepcopy(field.default)\n            continue\n        if field.dynamic and isinstance(value, str) and is_template(value):\n            out[key] = value\n            continue\n        check_type(value, field, path)\n        if field.choices is not None and value not in field.choices:\n            raise ConfigError(f\"invalid value {value!r}{suggest(str(value), [str(c) for c in field.choices])}\", path)\n        out[key] = value\n    return out", "lowcode/spec.py::is_template": "def is_template(value: Any) -> bool:\n    \"\"\"值（含嵌套结构）里是否写了 {{ }} / {% %} 模板。\"\"\"\n    if isinstance(value, str):\n        return \"{{\" in value or \"{%\" in value\n    if isinstance(value, dict):\n        return any(is_template(v) for v in value.values())\n    if isinstance(value, list):\n        return any(is_template(v) for v in value)\n    return False", "lowcode/datasources/__init__.py::from_config": "    def from_config(cls, entries: List[Dict[str, Any]], root: Path) -> \"DataSourceManager\":\n        \"\"\"按 server.yaml 的 dataSources（{name, type, config} 列表）实例化并自检；错误收集后一次性抛出。\"\"\"\n        items: List[DataSource] = []\n        errors = ErrorCollector()\n        for i, entry in enumerate(entries):\n            where = child(child(\"server.yaml\", \"dataSources\"), i)\n            with errors.collect():\n                ds_cls = _types.get(entry[\"type\"])\n                if ds_cls is None:\n                    raise ConfigError(f\"unknown datasource type {entry['type']!r}{suggest(entry['type'], sorted(_types))}\",\n                                      child(where, \"type\"))\n                items.append(create_datasource(\n                    ds_cls, entry[\"name\"], entry[\"config\"], root, child(where, \"config\")))\n        errors.raise_if_any()\n        return cls(items)", "lowcode/datasources/__init__.py::resolve": "    def resolve(self, name: Optional[str], kind: str, where: str) -> DataSource:\n        \"\"\"取数据源：指定 name 时按 (name, kind) 匹配；name 为空且该类别唯一时自动选中。\"\"\"\n        if name:\n            named = [d for d in self._items if d.name == name]\n            if not named:\n                raise ConfigError(f\"datasource {name!r} not found{suggest(name, sorted({d.name for d in self._items}))}\",\n                                  where)\n            matched = [d for d in named if d.kind == kind]\n            if not matched:\n                d = named[0]\n                raise ConfigError(f\"datasource {name!r} is {d.type} ({d.kind}), but {kind} is required\", where)\n            return matched[0]\n        candidates = [d for d in self._items if d.kind == kind]\n        if len(candidates) == 1:\n            return candidates[0]\n        names = \", \".join(d.name for d in candidates) or \"无\"\n        raise ConfigError(f\"cannot auto-select a {kind} datasource (candidates: {names}); \"\n                          f\"set dataSource on the node config or in the group file \"\n                          f\"({{module}}_{{group}}.yaml)\", where)", "lowcode/web/response.py::envelope": "def envelope(code: int, msg: str, data: Any, trace_id: str, status: int = 200) -> Response:\n    \"\"\"响应体固定为 {code, msg, traceId, data}；节点耗时由 Web 层写入服务端日志。\"\"\"\n    body: Dict[str, Any] = {\"code\": code, \"msg\": msg, \"traceId\": trace_id, \"data\": data}\n    resp = jsonify(body)\n    resp.status_code = status\n    return resp"};
+const modal = document.getElementById('modal');
+const titleEl = document.getElementById('modal-title');
+const codeEl = document.getElementById('modal-code');
+document.querySelectorAll('.fnlink').forEach(function (el) {
+  el.addEventListener('click', function () {
+    const file = el.dataset.file;
+    const fns = el.dataset.fns.split(',');
+    titleEl.textContent = file + ' :: ' + fns.join(' · ');
+    codeEl.textContent = fns.map(function (fn) {
+      return SRC[file + '::' + fn] || '// source not found: ' + file + ':' + fn;
+    }).join('\n\n// ' + '─'.repeat(60) + '\n\n');
+    modal.hidden = false;
+  });
+});
+document.getElementById('modal-close').addEventListener('click', function () { modal.hidden = true; });
+modal.addEventListener('click', function (e) { if (e.target === modal) modal.hidden = true; });
+document.addEventListener('keydown', function (e) { if (e.key === 'Escape') modal.hidden = true; });
+</script>
+</body>
+</html>

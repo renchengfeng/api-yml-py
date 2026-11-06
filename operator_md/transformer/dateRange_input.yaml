@@ -1,0 +1,49 @@
+# dateRange 用例集
+Three_Days:
+  desc: 含首尾的连续三天
+  inputs: {sday: "20261103", eday: "20261105"}
+  expect: {output: ["20261103", "20261104", "20261105"]}
+
+Single_Day:
+  desc: 起止同一天时只有一个元素
+  inputs: {sday: "20261103", eday: "20261103"}
+  expect: {output: ["20261103"]}
+
+Cross_Month:
+  desc: 跨月自动进位
+  inputs: {sday: "20261130", eday: "20261202"}
+  expect: {output: ["20261130", "20261201", "20261202"]}
+
+Dash_Format:
+  desc: format 决定输出形态
+  config: {format: "%Y-%m-%d"}
+  inputs: {sday: "2026-11-03", eday: "2026-11-04"}
+  expect: {output: ["2026-11-03", "2026-11-04"]}
+
+From_Upstream:
+  desc: 起止日期也可以来自上游节点输出
+  config: {start: "{{ r.s }}", end: "{{ r.e }}"}
+  upstream: {r: {s: "20261103", e: "20261104"}}
+  expect: {output: ["20261103", "20261104"]}
+
+Error_Start_After_End:
+  desc: 起点晚于终点时返回 400（参数问题，不是 500）
+  inputs: {sday: "20261105", eday: "20261103"}
+  expect: {error: {type: ParamError, code: 400, status: 400, msg: "is after end"}}
+
+Error_Too_Large:
+  desc: 天数超过 limit 时拒绝，避免下游 fan-out 打爆
+  config: {limit: 2}
+  inputs: {sday: "20261103", eday: "20261105"}
+  expect: {error: {type: ParamError, code: 400, msg: "date range too large"}}
+
+Error_Bad_Date:
+  desc: 日期本身不合法（13 月 32 日）
+  inputs: {sday: "20261332", eday: "20261105"}
+  expect: {error: {type: ParamError, code: 400, msg: "invalid date"}}
+
+BuildError_Bad_Format:
+  desc: format 写错在启动期就报错
+  config: {format: "%Q"}
+  inputs: {sday: "20261103", eday: "20261104"}
+  expect: {buildError: "invalid date format"}

@@ -1,0 +1,7 @@
+# dateRange 节点模板：把入参的日期区间展开成按天列表
+name: "dateRange"
+config:
+  start: "{{ inputs.sday }}"
+  end: "{{ inputs.eday }}"
+  format: "%Y%m%d"
+  limit: 92

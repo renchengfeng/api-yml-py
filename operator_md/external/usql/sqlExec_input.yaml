@@ -1,0 +1,68 @@
+# sqlExec 用例集
+_db: &db
+  sqlite:
+    name: main
+    setup: |
+      create table users (id integer primary key, name text not null, level integer not null);
+      insert into users(name, level) values ('a', 1), ('b', 3), ('c', 5);
+
+Insert:
+  desc: INSERT 返回影响行数与新行 id
+  inputs: {name: d, level: 2}
+  mocks: *db
+  expect: {output: {rowcount: 1, lastrowid: 4}}
+
+Insert_Whole_Inputs:
+  desc: params 整体写成 "{{ inputs }}"
+  config: {params: "{{ inputs }}"}
+  inputs: {name: e, level: 4}
+  mocks: *db
+  expect: {output: {rowcount: 1, lastrowid: 4}}
+
+Update:
+  desc: UPDATE 返回影响行数；非 INSERT 时 lastrowid 为 null
+  config:
+    sql: update users set level = :level where level < 3
+    params: {level: "{{ inputs.level }}"}
+  inputs: {level: 9}
+  mocks: *db
+  expect: {output: {rowcount: 1, lastrowid: null}}
+
+Delete_None_Matched:
+  desc: 没有命中时 rowcount 为 0，不报错
+  config:
+    sql: delete from users where id = :id
+    params: {id: "{{ inputs.id }}"}
+  inputs: {id: 99}
+  mocks: *db
+  expect: {output: {rowcount: 0, lastrowid: null}}
+
+Error_Constraint:
+  desc: 违反约束（NOT NULL）→ 事务回滚，500 带节点前缀
+  config: {params: {name: null, level: 1}}
+  mocks: *db
+  expect:
+    error: {type: ExecError, status: 500, msg: "[insert] IntegrityError"}
+
+Error_Readonly:
+  desc: 数据源 readonly=true 时写库被拒绝
+  inputs: {name: d, level: 2}
+  mocks:
+    sqlite:
+      name: main
+      readonly: true
+      setup: create table users (id integer primary key, name text, level integer);
+  expect:
+    error: {type: ExecError, msg: readonly}
+
+Build_Select_Statement:
+  desc: sqlExec 只接受 INSERT / UPDATE / DELETE / REPLACE，查询须改用 sqlQuery
+  config: {sql: select * from users, params: {}}
+  mocks: *db
+  expect: {buildError: "use sqlQuery instead"}
+
+Build_Missing_Param:
+  desc: SQL 中的绑定参数必须在 params 中提供
+  config: {params: {name: x}}
+  mocks: *db
+  expect: {buildError: "bind :level in SQL is not provided in params"}

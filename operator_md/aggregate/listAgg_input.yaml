@@ -1,0 +1,81 @@
+# listAgg 用例集。字段说明见 tests/operator_test/TESTING.md
+Success_All_Ops:
+  desc: 全部统计项；avg 保留 4 位小数，sum 为 int 时保持 int
+  upstream:
+    orders: [{id: 1, amount: 320.8}, {id: 2, amount: 427.16}, {id: 3, amount: 2}]
+  expect:
+    output: {count: 3, sum: 749.96, avg: 249.9867, min: 2, max: 427.16}
+
+Subset_Ops:
+  desc: 只输出声明的统计项，按声明顺序
+  config: {ops: [count, max]}
+  upstream:
+    orders: [{amount: 1}, {amount: 9}]
+  expect: {output: {count: 2, max: 9}}
+
+Count_Only:
+  desc: ops 只有 count 时不需要 field
+  config: {ops: [count], field: null}
+  upstream:
+    orders: [{status: paid}, {status: refunded}]
+  expect: {output: {count: 2}}
+
+Skip_Null_Values:
+  desc: 数值字段缺失或为 null 的行，数值统计跳过，但计入 count
+  upstream:
+    orders: [{amount: 10}, {amount: null}, {status: paid}, {amount: 20}]
+  expect:
+    output: {count: 4, sum: 30, avg: 15, min: 10, max: 20}
+
+Empty_List:
+  desc: 空列表兜底：sum=0，avg/min/max=null，不报错
+  upstream: {orders: []}
+  expect:
+    output: {count: 0, sum: 0, avg: null, min: null, max: null}
+
+All_Missing_Values:
+  desc: 全部行缺失数值字段时同样兜底
+  config: {ops: [count, sum, avg]}
+  upstream:
+    orders: [{status: paid}, {status: paid}]
+  expect:
+    output: {count: 2, sum: 0, avg: null}
+
+Error_Not_List:
+  desc: data 渲染结果不是列表 → 500，带节点前缀
+  config: {data: "{{ single }}"}
+  upstream: {single: {amount: 1}}
+  expect:
+    error: {type: ExecError, msg: "[listAgg] data must render to a list, got dict"}
+
+Error_Non_Number:
+  desc: 字段值是非数值（字符串）→ 500，显式报错而非静默丢数
+  upstream:
+    orders: [{amount: "12.5"}, {amount: 1}]
+  expect:
+    error: {type: ExecError, msg: "value '12.5' of field amount is not a number (bool/str are not aggregated)"}
+
+Error_Bool_Value:
+  desc: bool 不算数值（True 会被当成 1）
+  upstream:
+    orders: [{amount: true}]
+  expect:
+    error: {type: ExecError, msg: "is not a number"}
+
+Build_Unknown_Op:
+  desc: 统计项写错时给出可选值
+  config: {ops: [counts]}
+  upstream: {orders: []}
+  expect: {buildError: "unknown stats op 'counts' (available: count, sum, avg, min, max)"}
+
+Build_Duplicate_Op:
+  desc: ops 中有重复项
+  config: {ops: [count, count]}
+  upstream: {orders: []}
+  expect: {buildError: "duplicate entries in ops"}
+
+Build_Missing_Field:
+  desc: ops 含 count 之外的统计项时 field 必填
+  config: {ops: [count, sum], field: null}
+  upstream: {orders: []}
+  expect: {buildError: "field is required when ops includes anything other than count"}
