@@ -1,0 +1,2 @@
+name: "sqlBatch"
+config: {"dataSource": "main", "statements": [{"sql": "insert into users(name, level) values (:n1, 1)", "params": {"n1": "a"}}, {"sql": "insert into users(name, level) values (:n2, 2)", "params": {"n2": "b"}}]}

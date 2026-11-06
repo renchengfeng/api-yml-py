@@ -1,15 +1,15 @@
-"""算子层：编写算子所需的全部 API。分类沿用 datamore_lite —— filter / transformer / external / aggregate / selector：
+"""算子层：编写算子所需的全部 API。
 
-    from lowcode.operators import Field, Operator, register
+6 个分类按顺序判定，任何算子只归入一类：
 
-    filter       校验与断言，条件不满足即中断流程（对应 datamore 的 paramChecker）
-    transformer  只加工数据、决定输出形态（对应 datamore 的 respBuilder / respMergeBuilder）
-    external     与外部系统交互，按数据源分 usql / uhttp / uredis（对应 datamore 的 external/*）
-    aggregate    聚合统计：listAgg / groupBy（补全 datamore 预留的 aggregate/ 目录）
-    selector     字段投影：fieldPicker（补全 datamore 预留的 selector/ 目录）
-    custom       缺省分类（内置算子不用）
+    external     读写框架外部资源（usql / uhttp / uredis / ufs）
+    filter       条件不满足即中断请求
+    aggregate    多行归约成统计量
+    validate     按规则检查并输出报告，不中断
+    selector     只选取 / 投影 / 重命名 / 二选一
+    transformer  其余纯数据变换（无外部 I/O）
 
-各分类子包在本文件末尾导入：导入即注册（对标 datamore_lite 用空导入触发包级 init()）。
+各分类子包在本文件末尾导入：导入即注册。
 """
 from ..spec import Field
 from .base import Operator
@@ -18,4 +18,4 @@ from .registry import create_operator, get_operator, list_operators, register
 __all__ = ["Field", "Operator", "register", "get_operator", "list_operators", "create_operator"]
 
 # 导入各分类，完成内置算子的注册。必须放在末尾：此时基类与注册表已就绪。
-from . import aggregate, external, filter, selector, transformer  # noqa: E402,F401
+from . import aggregate, external, filter, selector, transformer, validate  # noqa: E402,F401

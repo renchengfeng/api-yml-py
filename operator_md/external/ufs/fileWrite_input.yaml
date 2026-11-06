@@ -1,0 +1,4 @@
+Escape:
+  desc: 拒绝目录穿越
+  config: {path: "../escape.txt"}
+  expect: {error: {type: BizError, status: 403, msg: 越界}}

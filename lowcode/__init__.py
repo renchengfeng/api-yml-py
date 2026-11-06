@@ -26,7 +26,8 @@ from .errors import BizError, ConfigError, LowcodeError
 from .operators import Field, Operator, register
 from .server import Lowcode, create_server
 from .web import create_app
+from .web.response import RawResponse
 
 __version__ = "0.1.0"
-__all__ = ["Lowcode", "create_server", "create_app", "Field", "Operator", "register",
+__all__ = ["Lowcode", "create_server", "create_app", "RawResponse", "Field", "Operator", "register",
            "LowcodeError", "ConfigError", "BizError"]

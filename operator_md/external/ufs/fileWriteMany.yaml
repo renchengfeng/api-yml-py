@@ -1,0 +1,2 @@
+name: "fileWriteMany"
+config: {"baseDir": "tests/fixtures/fs", "files": [{"path": "many/a.txt", "content": "a"}]}

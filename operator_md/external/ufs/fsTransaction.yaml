@@ -1,0 +1,2 @@
+name: "fsTransaction"
+config: {"baseDir": "tests/fixtures/fs", "operations": [{"op": "write", "path": "txn/a.txt", "content": "a"}]}

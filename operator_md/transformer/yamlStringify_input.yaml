@@ -1,0 +1,4 @@
+Object:
+  desc: 对象序列化为 YAML 文本
+  config: {data: {a: 1}}
+  expect: {output: "a: 1\n"}

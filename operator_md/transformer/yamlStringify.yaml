@@ -1,0 +1,2 @@
+name: "yamlStringify"
+config: {"data": {"a": 1}}

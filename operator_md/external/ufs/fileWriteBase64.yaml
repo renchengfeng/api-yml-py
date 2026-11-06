@@ -1,0 +1,2 @@
+name: "fileWriteBase64"
+config: {"baseDir": "tests/fixtures/fs", "path": "b64.bin", "contentBase64": "aGVsbG8="}

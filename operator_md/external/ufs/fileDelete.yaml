@@ -1,0 +1,2 @@
+name: "fileDelete"
+config: {"baseDir": "tests/fixtures/fs", "path": "a.yaml"}

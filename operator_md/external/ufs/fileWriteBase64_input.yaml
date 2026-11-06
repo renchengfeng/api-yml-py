@@ -1,0 +1,4 @@
+InvalidBase64:
+  desc: 非法 base64 返回 400
+  config: {path: b64.bin, contentBase64: not-base64}
+  expect: {error: {type: BizError, status: 400, msg: base64}}

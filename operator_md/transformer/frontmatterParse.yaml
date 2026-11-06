@@ -1,0 +1,2 @@
+name: "frontmatterParse"
+config: {"content": "---\\nname: demo\\n---\\nbody"}

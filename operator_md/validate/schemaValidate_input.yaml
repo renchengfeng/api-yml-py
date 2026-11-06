@@ -1,0 +1,13 @@
+Valid:
+  desc: 结构合法
+  config:
+    data: {id: a}
+    schema: {type: object, required: [id], properties: {id: {type: string}}}
+  expect: {output: {ok: true, errors: []}}
+
+Missing:
+  desc: 缺少必填字段
+  config:
+    data: {name: a}
+    schema: {type: object, required: [id]}
+  expect: {output: {ok: false, errors: [{path: "$.id", message: 缺少必填字段}]}}

@@ -1,0 +1,2 @@
+name: "hash"
+config: {"algorithm": "sha1", "content": "abc"}

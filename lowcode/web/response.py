@@ -1,6 +1,7 @@
 """响应信封：{code, msg, traceId, data}（字段名与 datamore_lite 的 DataMoreRsp 一致）。"""
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from typing import Any, Dict
 
@@ -26,6 +27,15 @@ class JSONProvider(DefaultJSONProvider):
         if isinstance(o, (set, frozenset, tuple)):
             return list(o)
         return DefaultJSONProvider.default(o)
+
+
+@dataclass
+class RawResponse:
+    """算子返回的原始 HTTP 结果：Web 层不套 lowcode 信封，直接输出（文件 / 二进制 / 自定义状态码）。"""
+
+    payload: Any
+    status: int = 200
+    headers: Dict[str, str] = field(default_factory=dict)
 
 
 def envelope(code: int, msg: str, data: Any, trace_id: str, status: int = 200) -> Response:

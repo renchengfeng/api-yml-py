@@ -1,0 +1,9 @@
+Deep:
+  desc: 深合并对象
+  config: {base: {a: {b: 1}}, patch: {a: {c: 2}}}
+  expect: {output: {a: {b: 1, c: 2}}}
+
+Shallow:
+  desc: 浅合并直接替换
+  config: {base: {a: {b: 1}}, patch: {a: {c: 2}}, deep: false}
+  expect: {output: {a: {c: 2}}}

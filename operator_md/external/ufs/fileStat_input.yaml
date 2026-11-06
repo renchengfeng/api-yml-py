@@ -1,0 +1,4 @@
+Missing:
+  desc: 不存在返回 404
+  config: {path: tree/nope.txt}
+  expect: {error: {type: BizError, status: 404, msg: 路径不存在}}

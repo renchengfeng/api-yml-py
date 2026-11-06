@@ -1,0 +1,2 @@
+name: "fileStat"
+config: {"baseDir": "tests/fixtures/fs", "path": "tree/a.txt"}

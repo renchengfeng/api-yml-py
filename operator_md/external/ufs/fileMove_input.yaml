@@ -1,0 +1,4 @@
+Missing:
+  desc: 源文件不存在
+  config: {from: tree/nope.txt, to: tree/new.txt}
+  expect: {error: {type: BizError, status: 404, msg: 源文件不存在}}

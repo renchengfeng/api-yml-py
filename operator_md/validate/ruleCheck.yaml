@@ -1,0 +1,7 @@
+name: "ruleCheck"
+config:
+  data: {nodes: [{id: a, skippable: false}]}
+  context: {ids: [a]}
+  rules:
+    - {check: unique, path: "nodes.*.id", message: 节点 id 必须唯一}
+    - {check: refExists, from: "nodes.*.id", target: ids, message: 节点不存在}

@@ -1,0 +1,15 @@
+WithMeta:
+  desc: 拆分 frontmatter 与 body
+  config:
+    content: |
+      ---
+      name: demo
+      tags: [a, b]
+      ---
+      # Demo
+  expect: {output: {meta: {name: demo, tags: [a, b]}, body: "# Demo\n"}}
+
+NoMeta:
+  desc: 没有 frontmatter 时 meta 为空
+  config: {content: plain text}
+  expect: {output: {meta: {}, body: plain text}}

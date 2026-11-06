@@ -1,2 +1,2 @@
 """usql：SQL 数据源算子（sqlite / mysql）。"""
-from . import sqlExec, sqlQuery  # noqa: F401  导入即注册
+from . import sqlBatch, sqlExec, sqlQuery  # noqa: F401  导入即注册

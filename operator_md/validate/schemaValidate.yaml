@@ -1,0 +1,2 @@
+name: "schemaValidate"
+config: {"data": {"id": "a"}, "schema": {"type": "object", "required": ["id"], "properties": {"id": {"type": "string"}}}}

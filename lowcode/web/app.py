@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, Union
 
-from flask import Flask, g, has_request_context, request
+from flask import Flask, Response, g, has_request_context, make_response, request
 from werkzeug.exceptions import HTTPException
 
 from ..core import ApiPlan, Context
@@ -22,7 +22,7 @@ from ..errors import LowcodeError, ParamError
 from ..operators import list_operators
 from ..runtime import Runtime, build_runtime
 from .logfile import DailyFileHandler
-from .response import JSONProvider, envelope, public_msg
+from .response import JSONProvider, RawResponse, envelope, public_msg
 
 log = logging.getLogger("lowcode")
 _TRACE_ID = re.compile(r"^[\w\-.]{1,64}$")  # 外部传入的 X-Request-Id 先校验格式，防日志注入
@@ -58,6 +58,11 @@ def _make_view(plan: ApiPlan, rt: Runtime) -> Callable[..., Any]:
         ctx = Context(inputs, request=_request_info(), timeout=plan.timeout, trace_id=g.trace_id)
         g.ctx = ctx  # after_request 用它把节点耗时写入服务端日志
         data = rt.executor.run(plan, ctx)
+        if isinstance(data, RawResponse):
+            resp = make_response(data.payload, data.status)
+            for key, value in data.headers.items():
+                resp.headers[key] = value
+            return resp
         return envelope(0, "ok", data, ctx.trace_id)
 
     view.__name__ = f"api_{plan.method}_{plan.url}"

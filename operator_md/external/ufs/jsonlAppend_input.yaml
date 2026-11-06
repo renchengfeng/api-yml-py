@@ -1,0 +1,4 @@
+Append:
+  desc: 追加两行 JSONL
+  config: {path: audit.jsonl, items: [{a: 1}, {a: 2}]}
+  expect: {output: {path: audit.jsonl, count: 2}}

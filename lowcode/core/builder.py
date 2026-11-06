@@ -16,8 +16,8 @@ from .template import GLOBALS, Template, compile_template
 
 RESERVED_IDS = frozenset({"inputs", "request"})  # 模板命名空间里的保留名，不能用作节点 id
 _ID = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
-_PATH_PARAM = re.compile(r"\{([A-Za-z_][A-Za-z0-9_]*)\}")
-_PATH_CHARS = re.compile(r"^[A-Za-z0-9_\-./~{}]*$")
+_PATH_PARAM = re.compile(r"\{(?:(path):)?([A-Za-z_][A-Za-z0-9_]*)\}")
+_PATH_CHARS = re.compile(r"^[A-Za-z0-9_\-./~{}:]*$")
 
 
 @dataclass
@@ -133,7 +133,7 @@ class Builder:
         if timeout <= 0:
             raise ConfigError(f"timeout must be > 0, got {timeout}", api.where)
         _check_outputs(api, nodes[result])
-        return ApiPlan(api=api, group=group, url=url, rule=_PATH_PARAM.sub(r"<\1>", url),
+        return ApiPlan(api=api, group=group, url=url, rule=_PATH_PARAM.sub(lambda m: "<path:%s>" % m.group(2) if m.group(1) else "<%s>" % m.group(2), url),
                        inputs=inputs, nodes=nodes, levels=levels, result=result, timeout=timeout)
 
     def _check_group(self, group: GroupDef) -> None:
@@ -198,7 +198,7 @@ def response_shape(plan: ApiPlan) -> Optional[Any]:
 
 def _with_path_params(api: ApiDef, url: str) -> List[InputDef]:
     """路径参数若未在 inputs 中声明，自动补成必填 string。"""
-    params = _PATH_PARAM.findall(url)
+    params = [m.group(2) for m in _PATH_PARAM.finditer(url)]
     if len(params) != len(set(params)):
         raise ConfigError(f"duplicate path parameter: {url}", child(api.where, "path"))
     declared = {d.name for d in api.inputs}

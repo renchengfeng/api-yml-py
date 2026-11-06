@@ -1,0 +1,4 @@
+EmptyDir:
+  desc: 目录不存在时返回空列表
+  config: {subdir: nope}
+  expect: {output: {items: [], count: 0}}

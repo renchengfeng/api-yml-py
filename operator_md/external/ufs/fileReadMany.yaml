@@ -1,0 +1,2 @@
+name: "fileReadMany"
+config: {"baseDir": "tests/fixtures/fs", "subdir": "", "suffix": ".yaml", "format": "yaml"}

@@ -137,7 +137,12 @@ def _load_api(f: Path, where: str, module: str, group: str, slug: str) -> ApiDef
     if isinstance(raw, dict) and isinstance(raw.get("method"), str):
         raw["method"] = raw["method"].upper()  # 方法名不区分大小写
     a = validate(raw, API_SPEC, where)
-    path = _check_path(a["path"], module, group, slug, child(where, "path"))
+    if a["pathOverride"]:
+        path = a["path"].strip().rstrip("/")
+        if not path.startswith("/"):
+            raise ConfigError("path must start with /", child(where, "path"))
+    else:
+        path = _check_path(a["path"], module, group, slug, child(where, "path"))
 
     inputs_at, graph_at = child(where, "inputs"), child(where, "graph")
     inputs = [_load_input(item, child(inputs_at, i)) for i, item in enumerate(a["inputs"])]

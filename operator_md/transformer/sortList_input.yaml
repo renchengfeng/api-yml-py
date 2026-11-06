@@ -1,0 +1,17 @@
+SortDesc:
+  desc: 按嵌套字段降序
+  config: {data: "{{ rows }}", field: "data.updated_at", desc: true}
+  upstream:
+    rows:
+      - {id: a, data: {updated_at: "2026-01-01"}}
+      - {id: b, data: {updated_at: "2026-01-02"}}
+  expect: {output: [{id: b, data: {updated_at: "2026-01-02"}}, {id: a, data: {updated_at: "2026-01-01"}}]}
+
+MissingLast:
+  desc: 缺失字段排在最后
+  config: {data: "{{ rows }}", field: "data.updated_at"}
+  upstream:
+    rows:
+      - {id: a}
+      - {id: b, data: {updated_at: "2026-01-02"}}
+  expect: {output: [{id: b, data: {updated_at: "2026-01-02"}}, {id: a}]}

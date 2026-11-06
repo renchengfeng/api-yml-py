@@ -1,0 +1,4 @@
+Fixed:
+  desc: 固定值便于测试
+  config: {prefix: "run-", value: fixed}
+  expect: {output: "run-fixed"}

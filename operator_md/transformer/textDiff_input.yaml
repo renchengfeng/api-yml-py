@@ -1,0 +1,4 @@
+Same:
+  desc: 相同文本返回空 diff
+  config: {left: "a\n", right: "a\n"}
+  expect: {output: ""}

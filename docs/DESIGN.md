@@ -156,15 +156,22 @@ class NumberCast(Operator):
 
 ### 4.4 分类与单一职责
 
-| 分类 | 职责 | 算子 |
-|---|---|---|
-| `external` | 与外部系统交互 | sqlQuery / sqlExec / httpRequest / redisGet / redisMGet |
-| `transformer` | 只加工数据、决定输出形态 | respBuilder / numberCast / rowFilter / dateRange / templateMap |
-| `aggregate` | 聚合统计 | listAgg / groupBy |
-| `selector` | 字段投影 | fieldPicker / renameFields |
-| `filter` | 断言与中断 | expectGuard |
+框架共 6 类、52 个内置算子。每个分类用一个可判定问题定义，按顺序判断：
 
-原则：一个算子只做一件事。缺能力时新增算子，而不是给现有算子加模式开关。
+| 顺序 | 分类 | 判定标准（是 → 归入） | 输出 | 副作用 |
+|---|---|---|---|---|
+| 1 | `external` | 读写框架外部资源（DB / HTTP / Redis / 文件系统 / 压缩包落地）？ | 数据或写入结果 | 允许 I/O |
+| 2 | `filter` | 条件不满足即中断请求（抛 `BizError`）？ | 透传 | 中断接口 |
+| 3 | `aggregate` | 把多行归约成统计量？ | 统计量 | 无 |
+| 4 | `validate` | 按规则检查并产出报告 `{valid, errors}`，不中断？ | 报告 | 无 |
+| 5 | `selector` | 只从已有值中选取 / 投影 / 重命名 / 二选一？ | 原值子集 | 无 |
+| 6 | `transformer` | 其余纯数据变换：输入 → 新值，无外部 I/O | 新值 | 无 |
+
+`external` 内部按系统分 `usql / uhttp / uredis / ufs`；其余分类扁平。
+原则：一个算子只做一件事；新增算子先按上表判定分类，缺能力时不给现有算子加模式开关。
+
+两个标注：`fsTransaction` 是组合型外部写操作（多步 + 补偿），按副作用归 `external`；
+`pickValue` 只是二选一取值，`branch` 已改名，避免与「不提供分支/循环」的设计决策冲突。
 
 ## 5. 执行引擎
 
@@ -191,6 +198,9 @@ class NumberCast(Operator):
 ```json
 {"code": 0, "msg": "ok", "traceId": "…", "data": …}
 ```
+
+算子也可返回 `lowcode.RawResponse`（payload / status / headers），Web 层直接输出原始 HTTP、绕过信封；
+这是文件下载、二进制内容与自定义状态码的通用出口。
 
 | 错误 | HTTP | 说明 |
 |---|---|---|

@@ -49,7 +49,7 @@ python3 -m lowcode check -c conf         # 只校验配置，打印路由表
 |---|---|---|
 | 库入口（推荐） | `python3 main.py` | 读 `conf/server.yaml`，默认 `127.0.0.1:8080` |
 | 换端口启动 | `PORT=9000 python3 main.py` | `server.yaml` 中 `port: ${PORT:-8080}` |
-| CLI 启动 | `python3 -m lowcode serve -c conf` | 指定任意配置目录；`--host/--port` 可覆盖 |
+| CLI 启动 | `python3 -m lowcode serve -c conf` | 等价启动方式 |
 | 生产部署 | `gunicorn -w 4 'main:server'` | `Lowcode` 实例本身是 WSGI app |
 
 `main.py` 只有三行有效代码：
@@ -63,7 +63,7 @@ if __name__ == "__main__":
     server.run()             # host / port 缺省读 server.yaml
 ```
 
-端口优先级：`PORT` 环境变量 → `server.yaml` 的 `server.port`；`serve --port` 或 `server.run(port=...)` 可再覆盖。
+端口优先级：`PORT` 环境变量 → `server.yaml` 的 `server.port`；`--port` 或 `server.run(port=...)` 可再覆盖。
 
 两个演示接口都从 Redis 取数（`conf/server.yaml` 的 `redis1` 数据源，默认 `localhost:6379`、密码 `12345678`）：
 
@@ -119,8 +119,8 @@ server:
 
 ## 算子
 
-内置 15 个算子，按职责分五类：`external`（SQL / HTTP / Redis）、`transformer`（结构转换）、
-`aggregate`（聚合）、`selector`（字段投影）、`filter`（断言中断）。
+内置 52 个算子，按职责分六类：`external`（外部资源 I/O）、`filter`（断言中断）、`aggregate`、
+`validate`（校验报告）、`selector`（字段选取）、`transformer`（纯数据变换）。
 
 完整列表、参数、选型与「新增算子」步骤见 **[operator_md/算子导航.md](operator_md/算子导航.md)**；
 运行时可用 `/_operators` 或 `api-yml-py operators` 查看。
@@ -147,7 +147,7 @@ docs/           架构、设计、测试文档与图示
 - [架构说明](docs/ARCHITECTURE.md) — 分层、目录职责、启动/编译/请求链
 - [设计说明](docs/DESIGN.md) — 四层模型、配置规范、算子框架、执行引擎、设计决策
 - [测试指南](docs/TESTING.md) — 四件套、用例字段、Mock、运行与排错
-- [算子导航](operator_md/算子导航.md) — 15 个算子的用途、参数与取舍
+- [算子导航](operator_md/算子导航.md) — 52 个算子的用途、参数与取舍
 - 图示：[架构与算子生命周期](docs/html/ARCHITECTURE.html)（分层、调用关系、数据流）
 
 ## 测试
@@ -156,7 +156,7 @@ docs/           架构、设计、测试文档与图示
 python3 -m unittest discover -s tests -t .
 ```
 
-当前：248 项通过（含 160 个算子用例、15 个注册检查、catalog 与框架单测）。
+当前：355 项通过（含算子用例、注册检查、catalog 与框架单测）。
 
 ## License
 

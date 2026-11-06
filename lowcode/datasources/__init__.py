@@ -26,6 +26,10 @@ class DataSource:
         self.root = root      # 相对路径的基准目录
         self.where = where
 
+    def transaction(self, statements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """sql 类：在一个事务中执行多条写语句；默认逐个执行。"""
+        return [self.execute(str(item["sql"]), item.get("params") or {}) for item in statements]
+
     def mget(self, keys: List[str]) -> List[Optional[str]]:
         """kv 类：批量读取，按键顺序返回，缺失为 None。
 

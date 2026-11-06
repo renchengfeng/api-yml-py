@@ -36,6 +36,14 @@ class SqliteDataSource(DataSource):
         with closing(self._connect()) as conn:
             return [dict(row) for row in conn.execute(sql, params)]
 
+    def transaction(self, statements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        with closing(self._connect()) as conn, conn:
+            results = []
+            for item in statements:
+                cur = conn.execute(str(item["sql"]), item.get("params") or {})
+                results.append({"rowcount": cur.rowcount, "lastrowid": cur.lastrowid or None})
+            return results
+
     def execute(self, sql: str, params: Dict[str, Any]) -> Dict[str, Any]:
         # 第二个 conn 是事务上下文：成功提交，异常回滚
         with closing(self._connect()) as conn, conn:

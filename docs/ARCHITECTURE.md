@@ -52,7 +52,7 @@ api-yml-py 是一个**配置编译型**框架，不是解释执行型：
 | `lowcode/core/context.py` | 请求级黑板 | `scope()` / `set_output()` / `record()` |
 | `lowcode/operators/base.py` | 算子契约 | `Operator.build()` / `execute()` |
 | `lowcode/operators/registry.py` | 注册表与编译期工厂 | `register()` / `get_operator()` / `create_operator()` |
-| `lowcode/operators/<分类>/` | 15 个内置算子 | 见 [算子导航](../operator_md/算子导航.md) |
+| `lowcode/operators/<分类>/` | 52 个内置算子（6 类） | 见 [算子导航](../operator_md/算子导航.md) |
 | `lowcode/datasources/` | 数据源实现 | `DataSource` / `DataSourceManager.resolve()` |
 | `lowcode/server.py` | 库式入口：app + runtime + 生命周期 | `Lowcode(conf).run()` / `close()` / `__call__`（WSGI） |
 | `lowcode/web/app.py` | Flask 应用工厂、路由、钩子 | `create_app()` / `view()` |

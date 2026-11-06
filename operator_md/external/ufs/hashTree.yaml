@@ -1,0 +1,2 @@
+name: "hashTree"
+config: {baseDir: tests/fixtures/fs, path: tree}

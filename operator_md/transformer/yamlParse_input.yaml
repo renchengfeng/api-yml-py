@@ -1,0 +1,12 @@
+Object:
+  desc: YAML 文本解析为对象
+  config:
+    content: |
+      id: a
+      name: Alpha
+  expect: {output: {id: a, name: Alpha}}
+
+Invalid:
+  desc: YAML 非法时返回 400
+  config: {content: "a: [1"}
+  expect: {error: {type: BizError, status: 400, msg: YAML 解析失败}}

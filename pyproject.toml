@@ -15,6 +15,7 @@ redis = ["redis>=5.0"]
 
 [project.scripts]
 lowcode = "lowcode.__main__:main"
+lowcode-main = "lowcode.launcher:main"
 
 [tool.setuptools.packages.find]
 include = ["lowcode*"]

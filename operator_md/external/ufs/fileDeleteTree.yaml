@@ -1,0 +1,2 @@
+name: "fileDeleteTree"
+config: {baseDir: tests/fixtures/fs, path: delete-tree}

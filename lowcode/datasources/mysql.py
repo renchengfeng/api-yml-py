@@ -89,6 +89,22 @@ class MysqlDataSource(DataSource):
         finally:
             conn.close()
 
+    def transaction(self, statements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        conn = self._connect()
+        try:
+            with conn.cursor() as cur:
+                results = []
+                for item in statements:
+                    rowcount = cur.execute(to_pyformat(str(item["sql"])), item.get("params") or {})
+                    results.append({"rowcount": rowcount, "lastrowid": cur.lastrowid or None})
+                conn.commit()
+                return results
+        except Exception:
+            conn.rollback()
+            raise
+        finally:
+            conn.close()
+
     def execute(self, sql: str, params: Dict[str, Any]) -> Dict[str, Any]:
         conn = self._connect()
         try:

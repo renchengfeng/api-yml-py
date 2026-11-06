@@ -1,0 +1,4 @@
+Missing:
+  desc: 目录不存在返回 404
+  config: {path: missing-tree}
+  expect: {error: {type: BizError, status: 404, msg: 目录不存在}}

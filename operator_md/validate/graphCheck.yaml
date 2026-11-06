@@ -1,0 +1,2 @@
+name: "graphCheck"
+config: {"nodes": [{"id": "a"}, {"id": "b"}], "edges": [{"from": "a", "to": "b"}]}

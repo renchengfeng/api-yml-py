@@ -1,0 +1,11 @@
+Object:
+  desc: 按路径投影单对象
+  config: {data: "{{ row }}", fields: {id: id, phase: data.phase}}
+  upstream: {row: {id: a, data: {phase: "01"}}}
+  expect: {output: {id: a, phase: "01"}}
+
+List:
+  desc: 对列表逐项投影
+  config: {data: "{{ rows }}", fields: {id: id, phase: data.phase}}
+  upstream: {rows: [{id: a, data: {phase: "01"}}, {id: b}]}
+  expect: {output: [{id: a, phase: "01"}, {id: b, phase: null}]}

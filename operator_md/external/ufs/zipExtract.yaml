@@ -1,0 +1,2 @@
+name: "zipExtract"
+config: {baseDir: tests/fixtures/fs, target: unzip, zipBase64: "UEsDBAoAAAAAA"}

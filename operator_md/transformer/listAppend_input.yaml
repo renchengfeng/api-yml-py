@@ -1,0 +1,4 @@
+Append:
+  desc: 追加一个元素
+  config: {data: [1], item: 2}
+  expect: {output: [1, 2]}

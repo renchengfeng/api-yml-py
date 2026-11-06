@@ -18,7 +18,7 @@ python3 -m unittest tests.operators.transformer.test_numberCast.TestNumberCast.t
 python3 -m unittest tests.operators.test_catalog -v
 ```
 
-当前基线：248 项通过，其中 160 个算子用例、15 个注册检查、catalog 与框架单测。
+当前基线：355 项通过，其中算子用例、注册检查、catalog 与框架单测。
 
 ## 2. 测试目录
 

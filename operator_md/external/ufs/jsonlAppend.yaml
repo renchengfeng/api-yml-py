@@ -1,0 +1,2 @@
+name: "jsonlAppend"
+config: {"baseDir": "tests/fixtures/fs", "path": "audit.jsonl", "items": [{"a": 1}, {"a": 2}]}

@@ -1,0 +1,4 @@
+SourceMissing:
+  desc: 源目录不存在返回 404
+  config: {from: missing-tree, to: tree-copy}
+  expect: {error: {type: BizError, status: 404, msg: 源目录不存在}}

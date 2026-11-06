@@ -1,0 +1,19 @@
+_db: &db
+  sqlite:
+    name: main
+    setup: |
+      create table users (id integer primary key, name text not null, level integer not null);
+
+InsertTwo:
+  desc: 事务中插入两条
+  mocks: *db
+  expect: {output: {results: [{rowcount: 1, lastrowid: 1}, {rowcount: 1, lastrowid: 2}]}}
+
+AtomicRollback:
+  desc: 第二条失败时整体回滚
+  mocks: *db
+  config:
+    statements:
+      - {sql: "insert into users(name, level) values ('a', 1)", params: {}}
+      - {sql: "insert into users(name, level) values (null, 2)", params: {}}
+  expect: {error: {type: ExecError, status: 500}}

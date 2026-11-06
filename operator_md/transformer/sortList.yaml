@@ -1,0 +1,2 @@
+name: "sortList"
+config: {"data": "{{ rows }}", "field": "data.updated_at", "desc": false}

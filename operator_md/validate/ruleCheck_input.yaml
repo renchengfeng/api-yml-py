@@ -1,0 +1,18 @@
+Valid:
+  desc: 唯一与引用检查通过
+  config:
+    data: {nodes: [{id: a}, {id: b}]}
+    context: {ids: [a, b]}
+    rules:
+      - {check: unique, path: "nodes.*.id"}
+      - {check: refExists, from: "nodes.*.id", target: ids}
+  expect: {output: {ok: true, errors: []}}
+
+Missing:
+  desc: 引用不存在
+  config:
+    data: {nodes: [{id: a}, {id: c}]}
+    context: {ids: [a, b]}
+    rules:
+      - {check: refExists, from: "nodes.*.id", target: ids}
+  expect: {output: {ok: false, errors: [{rule: 0, path: "nodes.*.id", missing: [c], message: 引用不存在}]}}

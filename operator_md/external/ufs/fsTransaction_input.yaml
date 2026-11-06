@@ -1,0 +1,11 @@
+Write:
+  desc: 执行一个写操作
+  config:
+    operations:
+      - {op: write, path: txn/a.txt, content: a}
+  expect: {output: {committed: true, operations: 1}}
+
+BadOp:
+  desc: 未知操作返回 400
+  config: {operations: [{op: nope}]}
+  expect: {error: {type: BizError, status: 400, msg: 非法事务操作}}

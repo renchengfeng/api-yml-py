@@ -1,0 +1,2 @@
+name: "fileCopy"
+config: {"baseDir": "tests/fixtures/fs", "from": "a.yaml", "to": "copy.yaml"}

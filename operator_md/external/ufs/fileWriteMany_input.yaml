@@ -1,0 +1,7 @@
+WriteTwo:
+  desc: 批量写两个文本文件
+  config:
+    files:
+      - {path: many/a.txt, content: a}
+      - {path: many/b.txt, content: b}
+  expect: {output: {files: [{path: many/a.txt, bytes: 1, rev: 86f7e437faa5a7fce15d1ddcb9eaeaea377667b8}, {path: many/b.txt, bytes: 1, rev: e9d71f5ee7c92d6dc9e92ffdad17b8bd49418f98}], count: 2, bytes: 2}}

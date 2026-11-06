@@ -1,0 +1,4 @@
+SourceMissing:
+  desc: 源文件不存在返回 404
+  config: {from: missing.yaml, to: copy.yaml}
+  expect: {error: {type: BizError, status: 404, msg: 文件不存在}}

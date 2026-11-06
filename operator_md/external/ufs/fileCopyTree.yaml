@@ -1,0 +1,2 @@
+name: "fileCopyTree"
+config: {"baseDir": "tests/fixtures/fs", "from": "tree", "to": "tree-copy"}

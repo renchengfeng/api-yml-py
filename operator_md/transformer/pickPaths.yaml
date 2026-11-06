@@ -1,0 +1,2 @@
+name: "pickPaths"
+config: {"data": "{{ row }}", "fields": {"id": "id", "phase": "data.phase"}}

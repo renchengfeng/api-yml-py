@@ -1,0 +1,9 @@
+Missing:
+  desc: 文件不存在时返回 404
+  config: {path: missing.yaml}
+  expect: {error: {type: BizError, status: 404, msg: 文件不存在}}
+
+Escape:
+  desc: 拒绝目录穿越
+  config: {path: "../a.yaml"}
+  expect: {error: {type: BizError, status: 403, msg: 越界}}

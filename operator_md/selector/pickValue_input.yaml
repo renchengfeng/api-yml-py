@@ -1,0 +1,9 @@
+True:
+  desc: 条件为真
+  config: {condition: true}
+  expect: {output: 'yes'}
+
+False:
+  desc: 条件为假
+  config: {condition: false}
+  expect: {output: 'no'}

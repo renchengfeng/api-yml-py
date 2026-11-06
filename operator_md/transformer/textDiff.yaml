@@ -1,0 +1,2 @@
+name: "textDiff"
+config: {"left": "a\n", "right": "a\n"}

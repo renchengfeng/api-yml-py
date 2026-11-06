@@ -1,0 +1,2 @@
+name: "fileMove"
+config: {"baseDir": "tests/fixtures/fs", "from": "tree/old.txt", "to": "tree/new.txt"}

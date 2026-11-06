@@ -1,0 +1,4 @@
+Missing:
+  desc: 文件不存在返回 404
+  config: {path: missing.txt}
+  expect: {error: {type: BizError, status: 404, msg: 文件不存在}}

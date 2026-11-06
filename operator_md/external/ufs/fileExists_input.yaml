@@ -1,0 +1,9 @@
+Exists:
+  desc: 文件存在
+  config: {path: tree/a.txt}
+  expect: {output: {exists: true, type: file, path: tree/a.txt}}
+
+Missing:
+  desc: 文件不存在
+  config: {path: tree/nope.txt}
+  expect: {output: {exists: false, type: "", path: tree/nope.txt}}

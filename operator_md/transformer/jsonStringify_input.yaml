@@ -1,0 +1,4 @@
+Compact:
+  desc: 默认紧凑输出
+  config: {data: {a: 1}}
+  expect: {output: '{"a":1}'}
