@@ -46,6 +46,8 @@ SERVER_SPEC = {
     "debug": Field(bool, default=False, desc="5xx 返回详细错误（生产建议关闭）；节点耗时始终写服务端日志"),
     "meta": Field(bool, default=True, desc="开放 /_apis、/_operators"),
     "logLevel": Field(str, default="INFO", choices=LOG_LEVELS),
+    "logFile": Field(str, default="", desc="日志文件路径（相对配置根目录）；空 = 只输出到控制台"),
+    "logBackup": Field(int, default=7, desc="按天切分保留的天数"),
 }
 
 # ---------------------------------------------------------------- 第二层：{module}_{group}.yaml
@@ -180,6 +182,8 @@ class ServerDef:
     data_sources: List[Dict[str, Any]]  # 已校验的 {name, type, config} 条目
     root: Path                      # 配置根目录（server.yaml 所在目录），相对路径以它为基准
     groups: List[GroupDef] = field(default_factory=list)
+    log_file: str = ""              # 空 = 只输出到控制台
+    log_backup: int = 7             # 按天切分保留天数
 
     @property
     def apis(self) -> List[ApiDef]:

@@ -21,6 +21,7 @@ from ..core.builder import response_shape
 from ..errors import LowcodeError, ParamError
 from ..operators import list_operators
 from ..runtime import Runtime, build_runtime
+from .logfile import DailyFileHandler
 from .response import JSONProvider, envelope, public_msg
 
 log = logging.getLogger("lowcode")
@@ -31,7 +32,7 @@ _HTTP_MSG = {404: "接口不存在", 405: "请求方法不支持", 413: "请求�
 def create_app(conf_dir: Union[str, Path] = "conf") -> Flask:
     """应用工厂：装配 Runtime 并注册全部接口。配置有误时抛 ConfigError。"""
     rt = build_runtime(conf_dir)
-    _setup_logging(rt.server.log_level)
+    _setup_logging(rt.server.log_level, rt.server.log_file, rt.server.log_backup, rt.server.root)
 
     # static_folder=None：不注册 /static 路由，避免与配置里的接口路径冲突
     app = Flask(__name__, static_folder=None)
@@ -108,7 +109,7 @@ def _log(level: int, event: str, **fields: Any) -> None:
     """一行一条日志：traceId=<id>|event=<事件>|k=v|...；按 traceId 可检索一次请求的所有日志。"""
     parts = [f"traceId={_current_trace_id()}", f"event={event}"]
     parts += [f"{key}={_one_line(value)}" for key, value in fields.items()]
-    log.log(level, "|".join(parts))
+    log.log(level, "|".join(parts), stacklevel=2)  # 行号指向 _log 的调用点
 
 
 def _current_trace_id() -> str:
@@ -120,10 +121,17 @@ def _one_line(value: Any) -> str:
     return " ".join(str(value).replace("|", ";").split())
 
 
-def _node_log(ctx: Optional[Context]) -> str:
-    """节点耗时、说明与错误，逗号分隔（竖线留给顶层字段）。"""
+def _node_timing(ctx: Optional[Context]) -> str:
+    """只含节点 id 与耗时，供 event=request 汇总行使用。"""
     if ctx is None or not ctx.trace:
         return "-"
+    return ",".join(f"{t['node']} {t['ms']}ms" for t in ctx.trace)
+
+
+def _node_detail(ctx: Optional[Context]) -> str:
+    """节点 id、算子、耗时、说明与错误，供 event=nodes 明细行使用；无节点时返回空串。"""
+    if ctx is None or not ctx.trace:
+        return ""
     parts = []
     for t in ctx.trace:
         part = f"{t['node']}({t['op']}) {t['ms']}ms"
@@ -149,8 +157,12 @@ def _register_hooks(app: Flask, rt: Runtime) -> None:
         trace_id = g.get("trace_id", "-")
         resp.headers["X-Trace-Id"] = trace_id
         ms = (time.perf_counter() - g.get("start", time.perf_counter())) * 1000
+        ctx = g.get("ctx")
         _log(logging.INFO, "request", method=request.method, path=request.path,
-             status=resp.status_code, ms=f"{ms:.1f}", nodes=_node_log(g.get("ctx")))
+             status=resp.status_code, ms=f"{ms:.1f}", nodes=_node_timing(ctx))
+        detail = _node_detail(ctx)
+        if detail:
+            _log(logging.INFO, "nodes", detail=detail)
         return resp
 
     @app.errorhandler(LowcodeError)
@@ -212,12 +224,33 @@ def _describe_plan(p: ApiPlan) -> Dict[str, Any]:
     return doc
 
 
-def _setup_logging(level: str) -> None:
-    """未配置日志时给一个默认格式；已由宿主程序配置时只调整级别。"""
+_LOG_FORMAT = ("caller=%(filename)s:%(lineno)d|time=%(asctime)s"
+               "|level=%(levelname)s|logger=%(name)s|%(message)s")
+_LOG_DATE = "%Y-%m-%d %H:%M:%S"
+
+
+def _setup_logging(level: str, log_file: str = "", backup: int = 7,
+                   root_dir: Optional[Path] = None) -> None:
+    """控制台 + 可选文件日志（按天切分）。宿主程序已配置 root handler 时只补文件与级别。
+
+    相对路径以配置根目录（server.yaml 所在目录）为基准；同名文件 handler 不会重复添加。
+    """
     root = logging.getLogger()
     if not root.handlers:
-        logging.basicConfig(format="time=%(asctime)s|level=%(levelname)s|logger=%(name)s|%(message)s",
-                            datefmt="%Y-%m-%d %H:%M:%S")
+        logging.basicConfig(format=_LOG_FORMAT, datefmt=_LOG_DATE)
         # werkzeug 的访问日志不带 traceId，与框架 event=request 重复；默认配置下只留框架日志
         logging.getLogger("werkzeug").setLevel(logging.ERROR)
     log.setLevel(level)
+    if not log_file:
+        return
+    path = Path(log_file)
+    if not path.is_absolute() and root_dir is not None:
+        path = Path(root_dir) / path
+    path = path.resolve()
+    target = (path.parent, path.stem)
+    for handler in log.handlers:
+        if isinstance(handler, DailyFileHandler) and (handler.directory, handler.stem) == target:
+            return
+    file_handler = DailyFileHandler(path.parent, path.stem, backup=backup)
+    file_handler.setFormatter(logging.Formatter(_LOG_FORMAT, _LOG_DATE))
+    log.addHandler(file_handler)

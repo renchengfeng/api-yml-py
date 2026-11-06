@@ -41,7 +41,9 @@ class WebBehaviorTest(TempConfCase):
         self.assertNotIn("trace", body)
         self.assertIn("event=error|", lines)
         self.assertIn("event=request|", lines)
-        self.assertIn("nodes=boom(boom)", lines)
+        self.assertIn("nodes=boom ", lines)              # 汇总行只带 ID + 耗时
+        self.assertIn("event=nodes|", lines)             # 明细行单独一条
+        self.assertIn("detail=boom(boom)", lines)
         self.assertIn("error=[boom] RuntimeError: kaboom", lines)
 
     def test_log_lines_are_single_kv_strings_sharing_trace_id(self):
@@ -57,8 +59,9 @@ class WebBehaviorTest(TempConfCase):
             self.assertTrue(message.startswith("traceId="))
             self.assertIn("|event=", message)
         same = [m for m in messages if "traceId=req-abc-123" in m]
-        self.assertEqual(len(same), 2)  # 一次请求的错误日志与访问日志
-        self.assertEqual({m.split("event=")[1].split("|")[0] for m in same}, {"error", "request"})
+        self.assertEqual(len(same), 3)  # 失败请求：error + request + nodes
+        self.assertEqual({m.split("event=")[1].split("|")[0] for m in same},
+                         {"error", "request", "nodes"})
 
     def test_meta_switch_and_repeated_query(self):
         api_text = api("graph: [{name: respBuilder, config: {data: '{{ inputs.ids }}'}}]",

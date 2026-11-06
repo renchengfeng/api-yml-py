@@ -201,8 +201,13 @@ class NumberCast(Operator):
 | `ExecError` | 500 | 非预期异常，带 `[节点id]` |
 | `ConfigError` | — | 启动期，不产生响应 |
 
-日志一行一个字符串，`k=v` + `|`，首字段 `traceId`；`event` 分 `startup / request / error / exception`。
+日志一行一个字符串，`k=v` + `|`；字段顺序 `caller / time / level / logger / traceId / event / …`，`caller=文件:行号` 由日志格式提供（`stacklevel` 指向真实调用点）。
+每个请求输出两行：`event=request` 汇总（`nodes` 只含节点 id 与耗时），`event=nodes` 明细（`detail=` 含算子与说明）。
 响应体**永远不含 trace**，节点耗时只写服务端日志。
+
+`server.logFile` 非空时同时写文件：相对路径以 `server.yaml` 所在目录（`conf/`）为基准，示例 `../logs/api-yml-py.log` 写到项目根 `logs/`，编码 UTF-8，
+每天一个文件 `app-YYYY-MM-DD.log`（`DailyFileHandler`，跨天自动切换，保留 `logBackup` 天）。
+多进程部署时切分由各进程独立触发，建议生产环境把 `logFile` 留空、交给 gunicorn / 外部 logrotate。
 
 ## 8. 启动期校验清单
 

@@ -71,13 +71,13 @@ class MysqlDataSource(DataSource):
     def check_dependencies(self) -> None:
         """pymysql 缺失时抛错：编译使用本数据源的接口时触发，启动期即暴露。"""
         if find_spec("pymysql") is None:
-            raise ConfigError('mysql datasource requires pymysql: pip install "lowcode[mysql]"', self.where)
+            raise ConfigError('mysql datasource requires pymysql: pip install "api-yml-py[mysql]"', self.where)
 
     def _connect(self):
         try:
             import pymysql
         except ImportError:
-            raise ConfigError('mysql datasource requires pymysql: pip install "lowcode[mysql]"', self.where) from None
+            raise ConfigError('mysql datasource requires pymysql: pip install "api-yml-py[mysql]"', self.where) from None
         return pymysql.connect(cursorclass=pymysql.cursors.DictCursor, **self._conn)
 
     def query(self, sql: str, params: Dict[str, Any]) -> List[Dict[str, Any]]:

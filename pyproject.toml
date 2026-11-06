@@ -3,7 +3,7 @@ requires = ["setuptools>=61"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "lowcode"
+name = "api-yml-py"
 version = "0.1.0"
 description = "YAML 驱动的 Flask 低代码 HTTP 框架（server / group / api / 算子 四层模型）"
 requires-python = ">=3.9"

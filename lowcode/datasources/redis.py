@@ -40,7 +40,7 @@ class RedisDataSource(DataSource):
     def check_dependencies(self) -> None:
         """redis-py 缺失时抛错：编译使用本数据源的接口时触发，启动期即暴露。"""
         if find_spec("redis") is None:
-            raise ConfigError('redis datasource requires redis-py: pip install "lowcode[redis]"', self.where)
+            raise ConfigError('redis datasource requires redis-py: pip install "api-yml-py[redis]"', self.where)
 
     def _connect_url(self) -> str:
         if self.config["url"]:
@@ -57,7 +57,7 @@ class RedisDataSource(DataSource):
                     try:
                         import redis
                     except ImportError:
-                        raise ConfigError('redis datasource requires redis-py: pip install "lowcode[redis]"', self.where) from None
+                        raise ConfigError('redis datasource requires redis-py: pip install "api-yml-py[redis]"', self.where) from None
                     t = self.config["timeout"]
                     self._client = redis.Redis.from_url(
                         self._connect_url(), socket_timeout=t, socket_connect_timeout=t,

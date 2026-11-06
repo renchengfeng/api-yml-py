@@ -8,6 +8,9 @@ server:
   prefix: /api               # 所有接口统一挂在 /api 下
   timeout: 5                 # 接口默认超时（秒），分组 / 接口可覆盖
   debug: true                # 5xx 返回详细错误；节点耗时写入服务端日志，不返回给用户
+  logLevel: INFO             # DEBUG / INFO / WARNING / ERROR
+  logFile: "../logs/api-yml-py.log"  # 相对配置目录（此处指向项目根 logs/）；每天一个文件，空 = 只输出控制台
+  logBackup: 7               # 切分后保留天数
 
 # 数据源：{name, type, config}，字段结构与 datamore_lite 对齐；同名可跨类别
 dataSources:

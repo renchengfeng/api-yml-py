@@ -1,4 +1,4 @@
-# lowcode
+# api-yml-py
 
 YAML 驱动的 Flask 低代码 HTTP 框架。用 **server → group → api → 算子** 四层模型描述接口：
 写配置就能得到 HTTP 接口，不需要为每个接口写 Python。
@@ -33,14 +33,37 @@ graph:
 
 ## 快速上手
 
+分发名是 **`api-yml-py`**（模块名仍是 `api-yml-py`，`import lowcode` 不变）：
+
 ```bash
-pip install -r requirements.txt          # 核心依赖：Flask + PyYAML
-pip install "lowcode[redis]"             # 用到 Redis / MySQL 时按需安装
+pip install -e .                         # 安装框架（核心依赖 Flask + PyYAML）
+pip install -e ".[redis]"                # 可选：Redis / MySQL 数据源
 
 python3 data/make_db.py                  # 生成演示库 data/demo.db
 python3 -m lowcode check -c conf         # 只校验配置，打印路由表
-python3 -m lowcode serve -c conf         # 启动服务，默认 127.0.0.1:8080
 ```
+
+### 启动服务
+
+| 方式 | 命令 | 说明 |
+|---|---|---|
+| 库入口（推荐） | `python3 main.py` | 读 `conf/server.yaml`，默认 `127.0.0.1:8080` |
+| 换端口启动 | `PORT=9000 python3 main.py` | `server.yaml` 中 `port: ${PORT:-8080}` |
+| CLI 启动 | `python3 -m lowcode serve -c conf` | 指定任意配置目录；`--host/--port` 可覆盖 |
+| 生产部署 | `gunicorn -w 4 'main:server'` | `Lowcode` 实例本身是 WSGI app |
+
+`main.py` 只有三行有效代码：
+
+```python
+from lowcode import Lowcode
+
+server = Lowcode("conf")     # 解析配置、编译接口；失败抛 ConfigError
+
+if __name__ == "__main__":
+    server.run()             # host / port 缺省读 server.yaml
+```
+
+端口优先级：`PORT` 环境变量 → `server.yaml` 的 `server.port`；`serve --port` 或 `server.run(port=...)` 可再覆盖。
 
 两个演示接口都从 Redis 取数（`conf/server.yaml` 的 `redis1` 数据源，默认 `localhost:6379`、密码 `12345678`）：
 
@@ -58,12 +81,6 @@ curl 'http://127.0.0.1:8080/_operators'  # 所有算子及 config 字段
 python3 -m lowcode explain -c conf       # 离线看每个接口的节点与响应结构
 ```
 
-生产部署：
-
-```bash
-gunicorn -w 4 'lowcode:create_app("conf")'
-```
-
 ## 配置长什么样
 
 ```
@@ -78,13 +95,35 @@ conf/
 文件名三段决定路由，接口里的 `path` 必须显式写出并与之一致；下划线是分隔符，接口名不能含下划线。
 需要路径参数时把追加段写进 `path`，如 `path: "/user/profile/detail/{uid}"`。
 
+## 日志
+
+默认输出到控制台；配置 `logFile` 后同时写入文件，**每天一个文件、文件名带日期**（保留 `logBackup` 天）：
+
+```yaml
+server:
+  logLevel: INFO
+  logFile: "../logs/api-yml-py.log"  # 相对 server.yaml 所在目录（conf/），此处写到项目根 logs/；留空 = 只输出控制台
+  logBackup: 7                  # 切分后保留天数
+```
+
+每个请求输出两行（`traceId` 相同，可按 `traceId` 关联）：
+
+- `event=request`：`method / path / status / ms / nodes`，`nodes` 只列「节点ID + 耗时」；
+- `event=nodes`：`detail=` 列「节点ID(算子) 耗时 说明」，便于定位每个节点做了什么。
+
+格式固定为 `caller=文件:行号|time=…|level=…|logger=lowcode|traceId=…|event=…|…`，`caller` 是日志打印位置（默认格式下由 handler 补充）；
+实际文件名形如 `../logs/api-yml-py-2026-11-06.log`（即项目根的 `logs/`）；跨天自动切换到新文件，早于保留天数的旧文件会被删除。
+
+> 多进程部署（`gunicorn -w 4`）时各进程会独立触发切分，建议 `logFile` 留空，交给 gunicorn 的
+> `--access-logfile/--error-logfile` 或外部 logrotate 统一收集。
+
 ## 算子
 
 内置 15 个算子，按职责分五类：`external`（SQL / HTTP / Redis）、`transformer`（结构转换）、
 `aggregate`（聚合）、`selector`（字段投影）、`filter`（断言中断）。
 
 完整列表、参数、选型与「新增算子」步骤见 **[operator_md/算子导航.md](operator_md/算子导航.md)**；
-运行时可用 `/_operators` 或 `lowcode operators` 查看。
+运行时可用 `/_operators` 或 `api-yml-py operators` 查看。
 
 ## 目录
 

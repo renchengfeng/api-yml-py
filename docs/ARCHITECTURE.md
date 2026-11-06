@@ -4,7 +4,7 @@
 
 ## 1. 定位
 
-lowcode 是一个**配置编译型**框架，不是解释执行型：
+api-yml-py 是一个**配置编译型**框架，不是解释执行型：
 
 - 启动时把 YAML 编译成 `ApiPlan`（节点、依赖、静态参数、已编译模板）；
 - 请求时只做「入参校验 → 模板渲染 → 调算子 → 写黑板 → 组响应」，不再解析 YAML。
@@ -42,7 +42,7 @@ lowcode 是一个**配置编译型**框架，不是解释执行型：
 | `lowcode/spec.py` | `Field` 声明、`validate()`、`is_template()`、报错定位 | `validate(config, spec, where)` |
 | `lowcode/errors.py` | 错误分层与汇总 | `ConfigError` / `ParamError` / `BizError` / `UpstreamError` / `DeadlineError` / `ExecError`、`ErrorCollector` |
 | `lowcode/config/loader.py` | 扫描目录、解析 YAML、结构校验 | `load_config()` / `load_node()` / `read_yaml()` |
-| `lowcode/config/models.py` | 配置模型与 `*_SPEC` | `ServerDef` / `GroupDef` / `ApiDef` / `NodeDef` / `InputDef` / `OutputDef` |
+| `lowcode/config/models.py` | 配置模型与 `*_SPEC`（含 `logFile` / `logBackup`） | `ServerDef` / `GroupDef` / `ApiDef` / `NodeDef` / `InputDef` / `OutputDef` |
 | `lowcode/runtime.py` | 装配根 | `build_runtime()` → `Runtime` |
 | `lowcode/core/builder.py` | 把 `ApiDef` 编成 `ApiPlan` | `Builder.build()` / `build_api()` / `compile_node()` / `_compile_config()` |
 | `lowcode/core/template.py` | `{{ }}` 编译与渲染 | `compile_template()` / `Template.render()` |
@@ -54,6 +54,7 @@ lowcode 是一个**配置编译型**框架，不是解释执行型：
 | `lowcode/operators/registry.py` | 注册表与编译期工厂 | `register()` / `get_operator()` / `create_operator()` |
 | `lowcode/operators/<分类>/` | 15 个内置算子 | 见 [算子导航](../operator_md/算子导航.md) |
 | `lowcode/datasources/` | 数据源实现 | `DataSource` / `DataSourceManager.resolve()` |
+| `lowcode/server.py` | 库式入口：app + runtime + 生命周期 | `Lowcode(conf).run()` / `close()` / `__call__`（WSGI） |
 | `lowcode/web/app.py` | Flask 应用工厂、路由、钩子 | `create_app()` / `view()` |
 | `lowcode/web/response.py` | 统一响应信封 | `envelope()` |
 | `lowcode/testing/` | 算子测试引擎 | `OperatorTestSuite` / `load_cases()` / `run_case()` |
@@ -125,3 +126,13 @@ view()
 | 改响应信封 | `web/response.py::envelope()` |
 | 改日志格式 | `web/app.py::_log()` |
 
+## 7. 运行方式
+
+| 方式 | 命令 | 入口 |
+|---|---|---|
+| 库入口 | `python3 main.py` / `PORT=9000 python3 main.py` | `main.py` → `Lowcode` → `create_app` → `build_runtime` |
+| CLI | `python3 -m lowcode serve -c conf` | `__main__._serve` → `create_app` |
+| WSGI | `gunicorn -w 4 'main:server'` | `Lowcode.__call__` → Flask app |
+
+`Lowcode`（`lowcode/server.py`）把 app、runtime、`run()`、`close()` 与 WSGI 调用收在一个对象里；
+`create_app()` 仍保留，供只需要 Flask app 的场景使用。

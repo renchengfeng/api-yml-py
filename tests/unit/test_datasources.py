@@ -18,14 +18,14 @@ class DependencyCheckTest(unittest.TestCase):
         with patch("lowcode.datasources.redis.find_spec", return_value=None):
             with self.assertRaises(ConfigError) as cm:
                 ds.check_dependencies()
-        self.assertIn('pip install "lowcode[redis]"', str(cm.exception))
+        self.assertIn('pip install "api-yml-py[redis]"', str(cm.exception))
 
     def test_mysql_missing_package_fails_at_startup(self):
         ds = _make(MysqlDataSource, {"sourceName": "root:12345678@tcp(localhost:3306)/datamore"})
         with patch("lowcode.datasources.mysql.find_spec", return_value=None):
             with self.assertRaises(ConfigError) as cm:
                 ds.check_dependencies()
-        self.assertIn('pip install "lowcode[mysql]"', str(cm.exception))
+        self.assertIn('pip install "api-yml-py[mysql]"', str(cm.exception))
 
     def test_installed_package_passes_check_without_connecting(self):
         ds = _make(RedisDataSource, {"url": "redis://localhost:6379/0"})

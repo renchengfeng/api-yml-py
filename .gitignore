@@ -5,3 +5,4 @@ data/demo.db
 .venv/
 .DS_Store
 *.log
+**/logs/

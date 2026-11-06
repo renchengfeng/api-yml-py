@@ -58,6 +58,7 @@ def load_config(root: Union[str, Path], errors: Optional[ErrorCollector] = None)
         name=top["name"], host=srv["host"], port=srv["port"], prefix=srv["prefix"],
         timeout=srv["timeout"], parallel=srv["parallel"], workers=srv["workers"],
         debug=srv["debug"], meta=srv["meta"], log_level=srv["logLevel"],
+        log_file=srv["logFile"], log_backup=srv["logBackup"],
         data_sources=top["dataSources"], root=root, groups=groups,
     )
 

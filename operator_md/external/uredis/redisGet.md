@@ -68,7 +68,7 @@
 | `format=csv` 但没有 `fields` | `format=csv 时 fields 必须是非空的字符串列表` |
 | `delimiter` 为空，或与 `rowDelimiter` 相同 | `delimiter 不能为空，也不能与 rowDelimiter 相同` |
 | `command` / `format` 取值非法 | 附近似名提示 |
-| 配置了 redis 数据源但未安装 redis-py | **启动即失败**：`redis datasource requires redis-py: pip install "lowcode[redis]"` |
+| 配置了 redis 数据源但未安装 redis-py | **启动即失败**：`redis datasource requires redis-py: pip install "api-yml-py[redis]"` |
 
 **运行期**：`format=json` 但值不是合法 JSON 时返回 500 `键 xxx 的值不是合法 JSON`。连接失败时返回 500，错误信息带节点前缀。
 
